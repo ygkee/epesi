@@ -5,8 +5,11 @@
  | program/steps/settings/edit_prefs.inc                                 |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2007, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2007, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Provide functionality for user's settings & preferences             |
@@ -48,8 +51,13 @@ function rcmail_user_prefs_form($attrib)
         if ($option['advanced'])
 	      $table->set_row_attribs('advanced');
 
-        $table->add('title', $option['title']);
-	    $table->add(null, $option['content']);
+        if (isset($option['title'])) {
+          $table->add('title', $option['title']);
+  	      $table->add(null, $option['content']);
+        }
+        else {
+          $table->add(array('colspan' => 2), $option['content']);
+        }
       }
 
       $out .= html::tag('fieldset', null, html::tag('legend', null, $block['name']) . $table->show($attrib));

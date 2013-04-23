@@ -1,22 +1,17 @@
 <?php
 
 /*
-
-+-----------------------------------------------------------------------+
-| localization/zh_TW/labels.inc                                         |
-|                                                                       |
-| Language file of the Roundcube Webmail client                         |
-| Copyright (C) 2005-2010, Roundcube Dev. - Switzerland                 |
-| Licensed under the GNU GPL                                            |
-|                                                                       |
-+-----------------------------------------------------------------------+
-| Author: WayneSan <waynesan@zerozone.tw>                               |
-|         kourge <kourge@gmail.com>                                     |
-|         Ting-Hung Chiu <earrl@mmlab.cse.yzu.edu.tw>                   |
-+-----------------------------------------------------------------------+
-
-@version $Id: labels.inc 4469 2011-01-29 14:55:12Z thomasb $
-
+ +-----------------------------------------------------------------------+
+ | localization/zh_TW/labels.inc                                         |
+ |                                                                       |
+ | Language file of the Roundcube Webmail client                         |
+ | Copyright (C) 2012, The Roundcube Dev Team                            |
+ | Licensed under the GNU General Public License                         |
+ |                                                                       |
+ +-----------------------------------------------------------------------+
+ | Author: Nansen <Unknown>                                              |
+ +-----------------------------------------------------------------------+
+ @version $Id$
 */
 
 $labels = array();
@@ -27,7 +22,7 @@ $labels['server'] = '伺服器';
 $labels['login'] = '登入';
 $labels['logout'] = '登出';
 $labels['mail'] = '電子郵件';
-$labels['settings'] = '個人設定';
+$labels['settings'] = '設定';
 $labels['addressbook'] = '通訊錄';
 $labels['inbox'] = '收件匣';
 $labels['drafts'] = '草稿匣';
@@ -46,10 +41,13 @@ $labels['size'] = '大小';
 $labels['priority'] = '優先順序';
 $labels['organization'] = '組織';
 $labels['readstatus'] = '讀信狀態';
+$labels['listoptions'] = '列表選項...';
 $labels['mailboxlist'] = '資料夾';
+$labels['folders'] = '資料夾';
 $labels['messagesfromto'] = '郵件 $from 至 $to，共有 $count 封郵件';
 $labels['threadsfromto'] = '郵件串 $from 至 $to，共有 $count 個';
 $labels['messagenrof'] = '第 $nr 封郵件，共有 $count 封';
+$labels['fromtoshort'] = '自 $from – $to 統計 $count';
 $labels['copy'] = '複製';
 $labels['move'] = '移動';
 $labels['moveto'] = '移至...';
@@ -75,7 +73,8 @@ $labels['jan'] = '一';
 $labels['feb'] = '二';
 $labels['mar'] = '三';
 $labels['apr'] = '四';
-$labels['may'] = '五';
+$labels['may'] = '五月';
+$labels['longmay'] = '五月';
 $labels['jun'] = '六';
 $labels['jul'] = '七';
 $labels['aug'] = '八';
@@ -87,7 +86,6 @@ $labels['longjan'] = '一月';
 $labels['longfeb'] = '二月';
 $labels['longmar'] = '三月';
 $labels['longapr'] = '四月';
-$labels['longmay'] = '五月';
 $labels['longjun'] = '六月';
 $labels['longjul'] = '七月';
 $labels['longaug'] = '八月';
@@ -96,35 +94,42 @@ $labels['longoct'] = '十月';
 $labels['longnov'] = '十一月';
 $labels['longdec'] = '十二月';
 $labels['today'] = '今日';
+$labels['refresh'] = '重新整理';
 $labels['checkmail'] = '檢查新郵件';
+$labels['compose'] = '撰寫新郵件';
 $labels['writenewmessage'] = '撰寫新郵件';
+$labels['reply'] = '回覆';
 $labels['replytomessage'] = '回覆';
 $labels['replytoallmessage'] = '全部回覆';
 $labels['replyall'] = '全部回覆';
 $labels['replylist'] = '清單回覆';
+$labels['forward'] = '轉寄';
+$labels['forwardinline'] = '轉寄';
+$labels['forwardattachment'] = '以附件方式轉寄';
 $labels['forwardmessage'] = '轉寄';
 $labels['deletemessage'] = '刪除郵件';
 $labels['movemessagetotrash'] = '移動郵件至垃圾桶';
 $labels['printmessage'] = '列印此郵件';
 $labels['previousmessage'] = '顯示上一封郵件';
-$labels['previousmessages'] = '顯示上一頁';
 $labels['firstmessage'] = '顯示第一封郵件';
-$labels['firstmessages'] = '顯示第一頁';
 $labels['nextmessage'] = '顯示下一封郵件';
-$labels['nextmessages'] = '顯示下一頁';
 $labels['lastmessage'] = '顯示最後一封郵件';
-$labels['lastmessages'] = '顯示最後一頁';
 $labels['backtolist'] = '回到郵件清單';
 $labels['viewsource'] = '顯示原始郵件';
+$labels['mark'] = '標記';
 $labels['markmessages'] = '標記選取的郵件為';
 $labels['markread'] = '標示為已讀取';
 $labels['markunread'] = '標示為未讀取';
 $labels['markflagged'] = '標上旗標';
 $labels['markunflagged'] = '移除旗標';
-$labels['messageactions'] = '更多動作…';
+$labels['moreactions'] = '資料夾動作...';
+$labels['more'] = '更多';
+$labels['back'] = '上一頁';
+$labels['options'] = '選項';
 $labels['select'] = '選取';
 $labels['all'] = '全部郵件';
 $labels['none'] = '無';
+$labels['nonesort'] = '無';
 $labels['currpage'] = '目前頁面';
 $labels['unread'] = '未讀取的郵件';
 $labels['flagged'] = '已加標記的郵件';
@@ -144,7 +149,6 @@ $labels['expand_only_unread'] = '只展開未讀訊息';
 $labels['fromto'] = '寄件者/收件者';
 $labels['flag'] = '旗標';
 $labels['attachment'] = '附件';
-$labels['nonesort'] = '無';
 $labels['sentdate'] = '寄送時間';
 $labels['arrival'] = '到達時間';
 $labels['asc'] = '遞增';
@@ -165,8 +169,7 @@ $labels['searchmod'] = '修改搜尋';
 $labels['msgtext'] = '整封郵件';
 $labels['openinextwin'] = '在新視窗開啟';
 $labels['emlsave'] = '下載（.eml）';
-$labels['compose'] = '撰寫新郵件';
-$labels['editasnew'] = '已新郵件編輯';
+$labels['editasnew'] = '以新郵件編輯';
 $labels['savemessage'] = '儲存成草稿';
 $labels['sendmessage'] = '立即寄出';
 $labels['addattachment'] = '增加附件檔案';
@@ -174,12 +177,17 @@ $labels['charset'] = '郵件編碼';
 $labels['editortype'] = '編輯器類型';
 $labels['returnreceipt'] = '要求讀取回條';
 $labels['dsn'] = '傳送狀態通知';
+$labels['mailreplyintro'] = '$sender 於 $date 寫到:';
+$labels['originalmessage'] = '郵件顯示設定';
 $labels['editidents'] = '編輯身份資訊';
+$labels['spellcheck'] = '拼字';
 $labels['checkspelling'] = '拼字檢查';
 $labels['resumeediting'] = '繼續編輯';
 $labels['revertto'] = '恢復至';
+$labels['attach'] = '附件';
 $labels['attachments'] = '附加檔案';
 $labels['upload'] = '上傳';
+$labels['uploadprogress'] = '$percent ($current / $total)';
 $labels['close'] = '關閉';
 $labels['messageoptions'] = '郵件選項...';
 $labels['low'] = '低';
@@ -190,6 +198,7 @@ $labels['highest'] = '最高';
 $labels['nosubject'] = '（沒有主旨）';
 $labels['showimages'] = '顯示圖片';
 $labels['alwaysshow'] = '永遠顯示來自 $sender 的圖片';
+$labels['isdraft'] = '這是一封草稿';
 $labels['htmltoggle'] = 'HTML';
 $labels['plaintoggle'] = '純文字';
 $labels['savesentmessagein'] = '儲存寄件備份至';
@@ -231,7 +240,26 @@ $labels['male'] = '男';
 $labels['female'] = '女';
 $labels['manager'] = '經理';
 $labels['assistant'] = '助理';
+$labels['typeassistant'] = '助理';
 $labels['spouse'] = '配偶';
+$labels['allfields'] = '所有欄位';
+$labels['search'] = '搜尋';
+$labels['advsearch'] = '進階搜尋';
+$labels['advanced'] = '進階設定';
+$labels['other'] = '其他';
+$labels['typeother'] = '其他';
+$labels['typehome'] = '住家';
+$labels['typework'] = '工作';
+$labels['typemobile'] = '行動電話';
+$labels['typemain'] = '主要';
+$labels['typehomefax'] = '住家傳真';
+$labels['typeworkfax'] = '工作傳真';
+$labels['typecar'] = '汽車';
+$labels['typepager'] = '傳呼機';
+$labels['typevideo'] = '影片';
+$labels['typehomepage'] = '首頁';
+$labels['typeblog'] = '部落格';
+$labels['typeprofile'] = '設定檔';
 $labels['addfield'] = '新增欄位...';
 $labels['addcontact'] = '新增聯絡人';
 $labels['editcontact'] = '編輯聯絡人';
@@ -245,6 +273,7 @@ $labels['delete'] = '刪除';
 $labels['rename'] = '重新命名';
 $labels['addphoto'] = '新增';
 $labels['replacephoto'] = '取代';
+$labels['uploadphoto'] = '上傳相片';
 $labels['newcontact'] = '建立新聯絡人資料';
 $labels['deletecontact'] = '刪除所選擇的聯絡人';
 $labels['composeto'] = '寄信至所選擇的聯絡人';
@@ -253,21 +282,27 @@ $labels['print'] = '列印';
 $labels['export'] = '匯出通訊錄';
 $labels['exportvcards'] = '匯出通訊錄為 vCard 格式';
 $labels['newcontactgroup'] = '新增聯絡人群組';
-$labels['groupactions'] = '聯絡人群組的動作';
+$labels['grouprename'] = '重新命名群組';
+$labels['groupdelete'] = '刪除群組';
+$labels['groupremoveselected'] = '從群組中刪除選擇的聯絡人';
 $labels['previouspage'] = '顯示上一頁';
 $labels['firstpage'] = '顯示第一頁';
 $labels['nextpage'] = '顯示下一頁';
 $labels['lastpage'] = '顯示最後一頁';
 $labels['group'] = '群組';
 $labels['groups'] = '群組';
-$labels['personaladrbook'] = '個人住址';
+$labels['personaladrbook'] = '個人通訊錄';
+$labels['searchsave'] = '儲存搜尋結果';
+$labels['searchdelete'] = '刪除搜尋結果';
 $labels['import'] = '匯入通訊錄';
 $labels['importcontacts'] = '由檔案匯入通訊錄';
 $labels['importfromfile'] = '選擇你要匯入的檔案:';
+$labels['importtarget'] = '新增連絡人至通訊錄:';
 $labels['importreplace'] = '以匯入的資料取代已存在的重複資料';
 $labels['importtext'] = '你可以由已存在的通訊錄上傳資料，<br/>目前系統僅支援匯入 <a href="http://zh.wikipedia.org/wiki/VCard" target="_blank">vCard</a> 格式的資料。';
 $labels['done'] = '完成';
 $labels['settingsfor'] = '設定';
+$labels['about'] = '關於';
 $labels['preferences'] = '設定';
 $labels['userpreferences'] = '個人設定';
 $labels['editpreferences'] = '編輯個人設定';
@@ -279,6 +314,8 @@ $labels['edititem'] = '編輯項目';
 $labels['preferhtml'] = '使用 HTML 顯示';
 $labels['defaultcharset'] = '預設編碼';
 $labels['htmlmessage'] = 'HTML 郵件';
+$labels['dateformat'] = '日期格式';
+$labels['timeformat'] = '時間格式';
 $labels['prettydate'] = '簡短日期顯示';
 $labels['setdefault'] = '設成預設i值';
 $labels['autodetect'] = '自動選擇';
@@ -307,6 +344,7 @@ $labels['readwhendeleted'] = '將刪除的郵件標示為已讀取';
 $labels['flagfordeletion'] = '刪除郵件時將原始郵件標示為已刪除';
 $labels['skipdeleted'] = '不要顯示已刪除的郵件';
 $labels['deletealways'] = '如果移到垃圾桶失敗，就直接刪除';
+$labels['deletejunk'] = '直接從垃圾郵件刪除';
 $labels['showremoteimages'] = '顯示遠端郵件內文中的圖片';
 $labels['fromknownsenders'] = '從已知的寄件者';
 $labels['always'] = '總是接受';
@@ -322,16 +360,17 @@ $labels['mimeparamfolding'] = '附加檔案名稱的編碼方式';
 $labels['2231folding'] = '完全 RFC 2231 模式（Thunderbird）';
 $labels['miscfolding'] = 'RFC 2047/2231 混合模式（MS Outlook）';
 $labels['2047folding'] = '完全 RFC 2047 模式（其他）';
-$labels['force7bit'] = '使用MIME編碼對於8位元字元';
+$labels['force7bit'] = '使用 MIME 編碼對於 8 位元字元';
 $labels['advancedoptions'] = '顯示進階設定選項';
 $labels['focusonnewmessage'] = '收到新郵件時使瀏覽器獲得焦點';
 $labels['checkallfolders'] = '檢查所有資料夾中的新郵件';
 $labels['displaynext'] = '郵件刪除／移動時顯示下一個郵件';
+$labels['defaultfont'] = 'HTML格式預設字型';
 $labels['mainoptions'] = '主要選項';
+$labels['browseroptions'] = '瀏覽選項';
 $labels['section'] = '分類';
 $labels['maintenance'] = '管理';
 $labels['newmessage'] = '新郵件';
-$labels['listoptions'] = '排列選項';
 $labels['signatureoptions'] = '簽名檔選項';
 $labels['whenreplying'] = '回覆時';
 $labels['replytopposting'] = '在原來的上方開始新訊息';
@@ -349,8 +388,17 @@ $labels['afternseconds'] = '$n 秒之後';
 $labels['reqmdn'] = '永遠索取讀取回條';
 $labels['reqdsn'] = '總是要求傳送狀態通知';
 $labels['replysamefolder'] = '將回覆與回覆信件放置於相同資料夾';
+$labels['defaultaddressbook'] = '新增連絡人至指定通訊錄';
+$labels['autocompletesingle'] = '在自動完成中略過另一個email';
+$labels['listnamedisplay'] = '標記聯絡人為';
+$labels['spellcheckbeforesend'] = '寄送前執行拼字檢查';
+$labels['spellcheckoptions'] = '拼字檢查選項';
+$labels['spellcheckignoresyms'] = '忽略符號';
+$labels['spellcheckignorenums'] = '忽略數字';
+$labels['spellcheckignorecaps'] = '忽略大寫字母';
+$labels['addtodict'] = '加入詞典';
+$labels['mailtoprotohandler'] = '註冊mailto:協定處理程式';
 $labels['folder'] = '資料夾';
-$labels['folders'] = '資料夾';
 $labels['foldername'] = '資料夾名稱';
 $labels['subscribed'] = '顯示';
 $labels['messagecount'] = '郵件數目';
@@ -365,9 +413,19 @@ $labels['location'] = '位置';
 $labels['info'] = '資訊';
 $labels['getfoldersize'] = '點擊顯示資料夾大小';
 $labels['changesubscription'] = '點擊以改變訂閱';
+$labels['foldertype'] = '資料夾類型';
+$labels['personalfolder'] = '私人資料夾';
+$labels['otherfolder'] = '其他使用者資料夾';
+$labels['sharedfolder'] = '公用資料夾';
 $labels['sortby'] = '排序';
 $labels['sortasc'] = '遞增排序';
 $labels['sortdesc'] = '遞減排序';
+$labels['undo'] = '復原';
+$labels['plugin'] = '擴充套件';
+$labels['version'] = '版本';
+$labels['source'] = '來源';
+$labels['license'] = '授權許可';
+$labels['support'] = '取得支援';
 $labels['B'] = 'B';
 $labels['KB'] = 'KB';
 $labels['MB'] = 'MB';
@@ -391,4 +449,3 @@ $labels['japanese'] = '日本';
 $labels['korean'] = '韓國';
 $labels['chinese'] = '國語';
 
-?>

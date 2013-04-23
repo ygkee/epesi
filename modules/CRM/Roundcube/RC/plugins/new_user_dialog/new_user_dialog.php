@@ -8,6 +8,7 @@
  * on the screen until the user has reviewed/completed his identity.
  *
  * @version @package_version@
+ * @license GNU GPLv3+
  * @author Thomas Bruederli
  */
 class new_user_dialog extends rcube_plugin
@@ -62,13 +63,27 @@ class new_user_dialog extends rcube_plugin
       $table->add(null, html::tag('input', array(
         'type' => 'text',
         'name' => '_email',
-        'value' => idn_to_utf8($identity['email']),
+        'value' => rcube_idn_to_utf8($identity['email']),
         'disabled' => ($identities_level == 1 || $identities_level == 3)
       )));
 
+      $table->add('title', $this->gettext('organization'));
+      $table->add(null, html::tag('input', array(
+        'type' => 'text',
+        'name' => '_organization',
+        'value' => $identity['organization']
+      )));
+
+      $table->add('title', $this->gettext('signature'));
+      $table->add(null, html::tag('textarea', array(
+        'name' => '_signature',
+        'rows' => '3',
+      ),$identity['signature']
+      ));
+
       // add overlay input box to html page
-      $rcmail->output->add_footer(html::div(array('id' => 'newuseroverlay'),
-        html::tag('form', array(
+      $rcmail->output->add_footer(html::tag('form', array(
+            'id' => 'newuserdialog',
             'action' => $rcmail->url('plugin.newusersave'),
             'method' => 'post'),
           html::tag('h3', null, Q($this->gettext('identitydialogtitle'))) .
@@ -77,16 +92,15 @@ class new_user_dialog extends rcube_plugin
           html::p(array('class' => 'formbuttons'),
             html::tag('input', array('type' => 'submit',
               'class' => 'button mainaction', 'value' => $this->gettext('save'))))
-        )
-      ));
+        ));
 
       // disable keyboard events for messages list (#1486726)
       $rcmail->output->add_script(
-        "$(document).ready(function () {
-          rcmail.message_list.key_press = function(){};
-          rcmail.message_list.key_down = function(){};
-          $('input[name=_name]').focus();
-          });", 'foot');
+        "rcmail.message_list.key_press = function(){};
+         rcmail.message_list.key_down = function(){};
+         $('#newuserdialog').show().dialog({ modal:true, resizable:false, closeOnEscape:false, width:420 });
+         $('input[name=_name]').focus();
+        ", 'docready');
 
       $this->include_stylesheet('newuserdialog.css');
     }
@@ -107,13 +121,15 @@ class new_user_dialog extends rcube_plugin
     $save_data = array(
       'name' => get_input_value('_name', RCUBE_INPUT_POST),
       'email' => get_input_value('_email', RCUBE_INPUT_POST),
+      'organization' => get_input_value('_organization', RCUBE_INPUT_POST),
+      'signature' => get_input_value('_signature', RCUBE_INPUT_POST),
     );
 
     // don't let the user alter the e-mail address if disabled by config
     if ($identities_level == 1 || $identities_level == 3)
       $save_data['email'] = $identity['email'];
     else
-      $save_data['email'] = idn_to_ascii($save_data['email']);
+      $save_data['email'] = rcube_idn_to_ascii($save_data['email']);
 
     // save data if not empty
     if (!empty($save_data['name']) && !empty($save_data['email'])) {

@@ -15,6 +15,7 @@ defined("_VALID_ACCESS") || die('Direct access forbidden');
 
 class Base_ActionBarCommon extends ModuleCommon {
 	private static $icons = array();
+    public static $quick_access_shortcuts = false;
 
 	public static $available_icons = array(
 			'home'		=> 0,
@@ -43,12 +44,6 @@ class Base_ActionBarCommon extends ModuleCommon {
 			'reply'		=> 23,
 			'forward'	=> 24);
 
-	public static function user_settings(){
-		return array(__('Misc')=>array(
-			array('name'=>'display','label'=>__('Action bar displays'),'type'=>'select','values'=>array('icons only'=>__('Icons only'),'text only'=>__('Text only'),'both'=>__('Both')),'default'=>'both','reload'=>true)
-			));
-	}
-
 	public static function add($type, $text, $action, $description=null, $position = 0) {
 //		if(!array_key_exists($type,self::$available_icons)) trigger_error('Invalid action '.$type,E_USER_ERROR);
 		foreach (self::$icons as $k=>$v) {
@@ -64,6 +59,10 @@ class Base_ActionBarCommon extends ModuleCommon {
 	public static function clean() {
 		self::$icons = array();
 	}
+    
+    public static function show_quick_access_shortcuts($value = true) {
+        self::$quick_access_shortcuts = $value;
+    }
 }
 on_exit(array('Base_ActionBarCommon','clean'));
 ?>

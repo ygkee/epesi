@@ -17,7 +17,7 @@ php_flag	zend.ze1_compatibility_mode	Off
 php_flag 	suhosin.session.encrypt 	Off
 
 #php_value	session.cookie_path		/
-php_value	session.auto_start	0
+php_flag	session.auto_start	Off
 php_value	session.gc_maxlifetime	21600
 php_value	session.gc_divisor	500
 php_value	session.gc_probability	1
@@ -28,7 +28,10 @@ php_value	mbstring.func_overload	0
 
 <IfModule mod_rewrite.c>
 RewriteEngine On
-RewriteRule ^favicon.ico$ skins/default/images/favicon.ico
+RewriteRule ^favicon\.ico$ skins/larry/images/favicon.ico
+# security rules
+RewriteRule .git - [F]
+RewriteRule ^/?(README(.md)?|INSTALL|LICENSE|SQL|bin|CHANGELOG)$ - [F]
 </IfModule>
 
 <IfModule mod_deflate.c>
@@ -47,4 +50,6 @@ ExpiresDefault "access plus 1 month"
 
 FileETag MTime Size
 
-
+<IfModule mod_autoindex.c>
+Options -Indexes
+</ifModule>

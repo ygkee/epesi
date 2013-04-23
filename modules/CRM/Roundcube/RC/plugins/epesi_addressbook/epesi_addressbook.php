@@ -42,10 +42,10 @@ class epesi_addressbook extends rcube_plugin
   {
     if ($p['id'] === $this->contacts_abook) {
       require_once(dirname(__FILE__) . '/epesi_contacts_addressbook_backend.php');
-      $p['instance'] = new epesi_contacts_addressbook_backend;
+      $p['instance'] = new epesi_contacts_addressbook_backend('Epesi Contacts');
     } elseif($p['id'] === $this->companies_abook) {
       require_once(dirname(__FILE__) . '/epesi_companies_addressbook_backend.php');
-      $p['instance'] = new epesi_companies_addressbook_backend;    
+      $p['instance'] = new epesi_companies_addressbook_backend('Epesi Companies');    
     }
 
     return $p;
@@ -56,14 +56,14 @@ class epesi_addressbook extends rcube_plugin
     global $OUTPUT;
     $mail = $r['record']['email'];
     require_once(dirname(__FILE__) . '/epesi_contacts_addressbook_backend.php');
-    $contacts = new epesi_contacts_addressbook_backend();
-    $ret = $contacts->search(null,$mail,true,false);
+    $contacts = new epesi_contacts_addressbook_backend('Epesi Contacts');
+    $ret = $contacts->search('email',$mail,true,false);
     if(count($ret->records)) {
-      $OUTPUT->show_message('contactexists'.print_r($ret,true), 'warning');
+      $OUTPUT->show_message('contactexists', 'warning');
     } else {
       require_once(dirname(__FILE__) . '/epesi_companies_addressbook_backend.php');
-      $companies = new epesi_companies_addressbook_backend();    
-      $ret = $companies->search(null,$mail,true,false);
+      $companies = new epesi_companies_addressbook_backend('Epesi Companies');    
+      $ret = $companies->search('email',$mail,true,false);
       if(count($ret->records)) {
         $OUTPUT->show_message('contactexists', 'warning');      
       } else {

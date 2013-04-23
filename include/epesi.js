@@ -201,4 +201,14 @@ function getTotalTopOffet(e) {
 	}
 	return ret;
 };
-
+is_visible = function(element) {
+	if (!element) return false;
+	var display = jQuery(element).css('display');
+	if (display == "none") return false;
+	if (element.parentNode && element.parentNode.style) {
+		xxx = element.parentNode;
+		return is_visible(element.parentNode);
+	}
+	return true;
+};
+jq=jQuery;

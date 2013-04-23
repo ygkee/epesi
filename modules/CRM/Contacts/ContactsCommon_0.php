@@ -13,6 +13,14 @@ defined("_VALID_ACCESS") || die('Direct access forbidden');
 
 class CRM_ContactsCommon extends ModuleCommon {
     public static $paste_or_new = 'new';
+	
+	public static function help() {
+		return Base_HelpCommon::retrieve_help_from_file(self::Instance()->get_type());
+	}
+
+	public static function home_page() {
+		return array(_M('My Contact')=>array('CRM/Contacts', 'body', array('my_contact')));
+	}
 
     public static function crm_clearance($all = false) {
 		$clearance = array();
@@ -89,14 +97,21 @@ class CRM_ContactsCommon extends ModuleCommon {
         return $me;
     }
     /*--------------------------------------------------------------------*/
+    public static $menu_override = array('contact'=>null, 'company'=>null);
     public static function menu() {
         $ret = array();
-		$opts = array();
-		$br_contact = Utils_RecordBrowserCommon::get_access('contact','browse');
-		$br_company = Utils_RecordBrowserCommon::get_access('company','browse');
-		if ($br_contact===true || !isset($br_contact['login']))
+                $opts = array();
+                if (self::$menu_override['contact']!==null)
+                        $br_contact = self::$menu_override['contact'];
+                else
+                        $br_contact = Utils_RecordBrowserCommon::get_access('contact','browse');
+                if (self::$menu_override['company']!==null)
+                        $br_company = self::$menu_override['company'];
+                else
+                        $br_company = Utils_RecordBrowserCommon::get_access('company','browse');
+		if ($br_contact===true || (is_array($br_contact) && !isset($br_contact['login'])))
 			$opts[_M('Contacts')] = array('mode'=>'contact','__icon__'=>'contacts.png','__icon_small__'=>'contacts-small.png');
-		if ($br_company===true || !isset($br_company['id']))
+		if ($br_company===true || (is_array($br_company) && !isset($br_company['id'])))
 			$opts[_M('Companies')] = array('mode'=>'company','__icon__'=>'companies.png','__icon_small__'=>'companies-small.png');
 		if (!empty($opts)) {
 			$opts['__submenu__'] = 1;
@@ -269,6 +284,11 @@ class CRM_ContactsCommon extends ModuleCommon {
         return $field;
     }
 
+    public static function employee_crits() {
+        $my_company = CRM_ContactsCommon::get_main_company();
+        return array('(company_name' => $my_company, '|related_companies' => array($my_company));
+    }
+
     public static function display_company_contact($record, $nolink, $desc) {
         $v = $record[$desc['id']];
 		if (!is_array($v) && isset($v[1]) && $v[1]!=':') return $v;
@@ -283,6 +303,9 @@ class CRM_ContactsCommon extends ModuleCommon {
         return $def;
     }
     public static function autoselect_company_contact_format($arg, $nolink=false) {
+        $icon = array('C' => Base_ThemeCommon::get_template_file('CRM/Contacts', 'company.png'),
+            'P' => Base_ThemeCommon::get_template_file('CRM/Contacts', 'person.png'));
+
         $x = explode(':', $arg);
         if(count($x)==2) {
             list($rset, $id) = $x;
@@ -298,35 +321,47 @@ class CRM_ContactsCommon extends ModuleCommon {
 			$val = self::company_format_default($id, $nolink);
 			$rlabel = __('C');
 		}
-        $val = '['.$rlabel.'] '.$val;
+        $indicator_text = ($rset == 'P' ? __('Person') : __('Company'));
+        $rindicator = isset($icon[$rset]) ?
+                '<span style="margin:1px 0.5em 1px 1px; width:1.5em; height:1.5em; display:inline-block; vertical-align:middle; background-image:url(\''.$icon[$rset].'\'); background-repeat:no-repeat; background-position:left center; background-size:100%"><span style="display:none">['.$indicator_text.'] </span></span>' : "[$rlabel] ";
+        $val = $rindicator.$val;
         return $val;
     }
     public static function auto_company_contact_suggestbox($str, $fcallback) {
-        $str = explode(' ', trim($str));
-        $ret = array();
-        foreach (array('contact'=>'P', 'company'=>'C') as $k=>$v) {
+        $words = explode(' ', trim($str));
+        $final_nr_of_records = 10;
+        $recordset_records = array();
+        foreach (array('contact'=>'P', 'company'=>'C') as $recordset=>$recordset_indicator) {
             $crits = array();
-            foreach ($str as $v2) if ($v2) {
-                $v2 = DB::Concat(DB::qstr('%'),DB::qstr($v2),DB::qstr('%'));
-                switch ($k) {
+            foreach ($words as $word) if ($word) {
+                $word = DB::Concat(DB::qstr('%'),DB::qstr($word),DB::qstr('%'));
+                switch ($recordset) {
                     case 'contact':
-                        $crits = Utils_RecordBrowserCommon::merge_crits($crits, array('(~"last_name'=>$v2,'|~"first_name'=>$v2));
+                        $crits = Utils_RecordBrowserCommon::merge_crits($crits, array('(~"last_name'=>$word,'|~"first_name'=>$word));
                         $order = array('last_name'=>'ASC', 'first_name'=>'ASC');
                         break;
                     case 'company':
-                        $crits = Utils_RecordBrowserCommon::merge_crits($crits, array('~"company_name'=>$v2));
+                        $crits = Utils_RecordBrowserCommon::merge_crits($crits, array('~"company_name'=>$word));
                         $order = array('company_name'=>'ASC');
                         break;
                 }
             }
-            $recs = Utils_RecordBrowserCommon::get_records($k, $crits, array(), $order, 10);
-            foreach($recs as $v2) {
-                $key = $v.':'.$v2['id'];
-                $ret[$key] = self::autoselect_company_contact_format($key,true);
+            $recordset_records[$recordset_indicator] = Utils_RecordBrowserCommon::get_records($recordset, $crits, array(), $order, $final_nr_of_records);
+        }
+        $total = 0;
+        foreach ($recordset_records as $records)
+            $total += count($records);
+        if ($total != 0)
+            foreach ($recordset_records as $key => $records)
+                $recordset_records[$key] = array_slice($records, 0, ceil($final_nr_of_records * count($records) / $total));
+        $ret = array();
+        foreach ($recordset_records as $recordset_indicator => $records) {
+            foreach ($records as $rec) {
+                $key = $recordset_indicator . ':' . $rec['id'];
+                $ret[$key] = call_user_func($fcallback, $key, true);
             }
         }
         asort($ret);
-        $ret = array_slice($ret, 0, 10, true);
         return $ret;
     }
 
@@ -379,7 +414,9 @@ class CRM_ContactsCommon extends ModuleCommon {
         } else {
             $group = '';
         }
-        return Utils_TooltipCommon::format_info_tooltip(array(__('Group')=>$group,
+        return Utils_TooltipCommon::format_info_tooltip(array(
+				__('Company')=>'<STRONG>'.$record['company_name'].'</STRONG>',
+				__('Group')=>$group,
                 __('Phone')=>$record['phone'],
                 __('Fax')=>$record['fax'],
                 __('Email')=>$record['email'],
@@ -653,12 +690,14 @@ class CRM_ContactsCommon extends ModuleCommon {
         return $def;
     }
     public static function QFfield_company(&$form, $field, $label, $mode, $default, $desc, $rb, $display_callbacks) {
-        if (($mode=='add' || $mode=='edit') && is_object($rb) && $rb->tab==='contact') {
+        static $showed_create_company = false;
+        if (($mode=='add' || $mode=='edit') && is_object($rb) && $rb->tab==='contact' && !$showed_create_company) {
+            $showed_create_company = true;
             if (self::$paste_or_new=='new') {
 				$access = Utils_RecordBrowserCommon::get_access('contact', $mode, Utils_RecordBrowser::$last_record);
 				$c_access = Utils_RecordBrowserCommon::get_access('company', 'add');
 				if ($c_access && $access['company_name']) {
-					$form->addElement('checkbox', 'create_company', __('Create new company'), null, 'onClick="$(\'company_name\').disabled = this.checked;document.getElementsByName(\'create_company_name\')[0].disabled=!this.checked;" '.Utils_TooltipCommon::open_tag_attrs(__('Create a new company for this contact')));
+					$form->addElement('checkbox', 'create_company', __('Create new company'), null, 'onClick="document.getElementById(\'company_name\').disabled = this.checked;document.getElementsByName(\'create_company_name\')[0].disabled=!this.checked;" '.Utils_TooltipCommon::open_tag_attrs(__('Create a new company for this contact')));
 					$form->addElement('text', 'create_company_name', __('New company name'), array('disabled'=>1));
 					$form->addFormRule(array('CRM_ContactsCommon', 'check_new_company_name'));
 					if (isset($rb) && isset($rb->record['last_name']) && isset($rb->record['first_name'])) $form->setDefaults(array('create_company_name'=>$rb->record['last_name'].' '.$rb->record['first_name']));
@@ -922,7 +961,7 @@ class CRM_ContactsCommon extends ModuleCommon {
             return '<a href="tel:'.$args[1].'">'.$r[$desc['id']].'</a>';
         $num = $r[$desc['id']];
         if($num && strpos($num,'+')===false) {
-            if($r['country']) {
+            if(isset($r['country']) && $r['country']) {
                 $calling_code = Utils_CommonDataCommon::get_value('Calling_Codes/'.$r['country']);
                 if($calling_code)
                     $num = $calling_code.$num;
@@ -1096,18 +1135,16 @@ class CRM_ContactsCommon extends ModuleCommon {
             $result = self::get_contacts($crits);
 
             foreach ($result as $row)
-                $ret[$row['id']] = Utils_RecordBrowserCommon::record_link_open_tag('contact', $row['id']).__( 'Contact #%d, %s %s', array($row['id'], $row['first_name'], $row['last_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
+                $ret[] = Utils_RecordBrowserCommon::record_link_open_tag('contact', $row['id']).__( 'Contact #%d, %s %s', array($row['id'], $row['first_name'], $row['last_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
         }
         if(Utils_RecordBrowserCommon::get_access('company','browse')) {
-            $result = self::get_companies(array('"~company_name'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\'')));
+            $crits = array('("~company_name' => DB::Concat(DB::qstr('%'),DB::qstr($word),DB::qstr('%')),
+                '|"~short_name' => DB::Concat(DB::qstr('%'),DB::qstr($word),DB::qstr('%')));
+
+            $result = self::get_companies($crits);
 
             foreach ($result as $row)
-                $ret[$row['id']] = Utils_RecordBrowserCommon::record_link_open_tag('company', $row['id']).__( 'Company #%d, %s', array($row['id'], $row['company_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
-
-            $result = self::get_companies(array('"~short_name'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\'')));
-
-            foreach ($result as $row)
-                $ret[$row['id']] = Utils_RecordBrowserCommon::record_link_open_tag('company', $row['id']).__( 'Company #%d, %s', array($row['id'], $row['company_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
+                $ret[] = Utils_RecordBrowserCommon::record_link_open_tag('company', $row['id']).__( 'Company #%d, %s', array($row['id'], $row['company_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
         }
 
         return $ret;

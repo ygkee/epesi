@@ -5,8 +5,11 @@
  | program/steps/settings/func.inc                                       |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2007, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2012, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Provide functionality for user's settings & preferences             |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: func.inc 4509 2011-02-09 10:51:50Z thomasb $
+ $Id$
 
 */
 
@@ -63,14 +66,14 @@ function rcmail_sections_list($attrib)
 
 function rcmail_identities_list($attrib)
 {
-  global $OUTPUT, $USER, $RCMAIL;
+  global $OUTPUT, $RCMAIL;
 
   // add id to message list table if not specified
   if (!strlen($attrib['id']))
     $attrib['id'] = 'rcmIdentitiesList';
 
   // get identities list and define 'mail' column
-  $list = $USER->list_identities();
+  $list = $RCMAIL->user->list_identities();
   foreach ($list as $idx => $row)
     $list[$idx]['mail'] = trim($row['name'] . ' <' . rcube_idn_to_utf8($row['email']) .'>');
 
@@ -131,6 +134,7 @@ function rcmail_user_prefs($current=null)
   $sections['mailbox'] = array('id' => 'mailbox', 'section' => rcube_label('mailboxview'));
   $sections['compose'] = array('id' => 'compose', 'section' => rcube_label('messagescomposition'));
   $sections['mailview'] = array('id' => 'mailview','section' => rcube_label('messagesdisplaying'));
+  $sections['addressbook'] = array('id' => 'addressbook','section' => rcube_label('addressbook'));
   $sections['folders'] = array('id' => 'folders', 'section' => rcube_label('specialfolders'));
   $sections['server'] = array('id' => 'server',  'section' => rcube_label('serversettings'));
 
@@ -155,8 +159,8 @@ function rcmail_user_prefs($current=null)
     case 'general':
 
     $blocks = array(
-      'main' => array('name' => Q(rcube_label('mainoptions'))),
-      'list' => array('name' => Q(rcube_label('listoptions'))),
+      'main'    => array('name' => Q(rcube_label('mainoptions'))),
+      'browser' => array('name' => Q(rcube_label('browseroptions'))),
     );
 
     // language selection
@@ -174,50 +178,32 @@ function rcmail_user_prefs($current=null)
       );
     }
 
-    // show page size selection
+    // timezone selection
     if (!isset($no_override['timezone'])) {
       $field_id = 'rcmfd_timezone';
-      $select_timezone = new html_select(array('name' => '_timezone', 'id' => $field_id, 'onchange' => "document.getElementById('rcmfd_dst').disabled=this.selectedIndex==0"));
+      $select_timezone = new html_select(array('name' => '_timezone', 'id' => $field_id));
       $select_timezone->add(rcube_label('autodetect'), 'auto');
-      $select_timezone->add('(GMT -11:00) Midway Island, Samoa', '-11');
-      $select_timezone->add('(GMT -10:00) Hawaii', '-10');
-      $select_timezone->add('(GMT -9:30) Marquesas Islands', '-9.5');
-      $select_timezone->add('(GMT -9:00) Alaska', '-9');
-      $select_timezone->add('(GMT -8:00) Pacific Time (US/Canada)', '-8');
-      $select_timezone->add('(GMT -7:00) Mountain Time (US/Canada)', '-7');
-      $select_timezone->add('(GMT -6:00) Central Time (US/Canada), Mexico City', '-6');
-      $select_timezone->add('(GMT -5:00) Eastern Time (US/Canada), Bogota, Lima', '-5');
-      $select_timezone->add('(GMT -4:30) Caracas', '-4.5');
-      $select_timezone->add('(GMT -4:00) Atlantic Time (Canada), La Paz', '-4');
-      $select_timezone->add('(GMT -3:30) Nfld Time (Canada), Nfld, S. Labador', '-3.5');
-      $select_timezone->add('(GMT -3:00) Brazil, Buenos Aires, Georgetown', '-3');
-      $select_timezone->add('(GMT -2:00) Mid-Atlantic', '-2');
-      $select_timezone->add('(GMT -1:00) Azores, Cape Verde Islands', '-1');
-      $select_timezone->add('(GMT) Western Europe, London, Lisbon, Casablanca', '0');
-      $select_timezone->add('(GMT +1:00) Central European Time', '1');
-      $select_timezone->add('(GMT +2:00) EET: Tallinn, Helsinki, Kaliningrad, South Africa', '2');
-      $select_timezone->add('(GMT +3:00) Baghdad, Kuwait, Riyadh, Moscow, Nairobi', '3');
-      $select_timezone->add('(GMT +3:30) Tehran', '3.5');
-      $select_timezone->add('(GMT +4:00) Abu Dhabi, Muscat, Baku, Tbilisi', '4');
-      $select_timezone->add('(GMT +4:30) Kabul', '4.5');
-      $select_timezone->add('(GMT +5:00) Ekaterinburg, Islamabad, Karachi', '5');
-      $select_timezone->add('(GMT +5:30) Chennai, Kolkata, Mumbai, New Delhi', '5.5');
-      $select_timezone->add('(GMT +5:45) Kathmandu', '5.75');
-      $select_timezone->add('(GMT +6:00) Almaty, Dhaka, Colombo', '6');
-      $select_timezone->add('(GMT +6:30) Cocos Islands, Myanmar', '6.5');
-      $select_timezone->add('(GMT +7:00) Bangkok, Hanoi, Jakarta', '7');
-      $select_timezone->add('(GMT +8:00) Beijing, Perth, Singapore, Taipei', '8');
-      $select_timezone->add('(GMT +8:45) Caiguna, Eucla, Border Village', '8.75');
-      $select_timezone->add('(GMT +9:00) Tokyo, Seoul, Yakutsk', '9');
-      $select_timezone->add('(GMT +9:30) Adelaide, Darwin', '9.5');
-      $select_timezone->add('(GMT +10:00) EAST/AEST: Sydney, Guam, Vladivostok', '10');
-      $select_timezone->add('(GMT +10:30) New South Wales', '10.5');
-      $select_timezone->add('(GMT +11:00) Magadan, Solomon Islands', '11');
-      $select_timezone->add('(GMT +11:30) Norfolk Island', '11.5');
-      $select_timezone->add('(GMT +12:00) Auckland, Wellington, Kamchatka', '12');
-      $select_timezone->add('(GMT +12:45) Chatham Islands', '12.75');
-      $select_timezone->add('(GMT +13:00) Tonga, Pheonix Islands', '13');
-      $select_timezone->add('(GMT +14:00) Kiribati', '14');
+
+      $zones = array();
+      foreach (DateTimeZone::listIdentifiers() as $i => $tzs) {
+        try {
+          $tz = new DateTimeZone($tzs);
+          $date = new DateTime('2012-12-21', $tz);
+          $offset = $date->format('Z') + 45000;
+          $sortkey = sprintf('%06d.%s', $offset, $tzs);
+          $zones[$sortkey] = array($tzs, $date->format('P'));
+        }
+        catch (Exception $e) {}
+      }
+
+      ksort($zones);
+      foreach ($zones as $zone) {
+        list($tzs, $offset) = $zone;
+        $select_timezone->add('(GMT ' . $offset . ') ' . strtr($tzs, '_', ' '), $tzs);
+      }
+
+      if (is_numeric($config['timezone']))
+        timezone_name_from_abbr("", $config['timezone'] * 3600, 0);
 
       $blocks['main']['options']['timezone'] = array(
         'title' => html::label($field_id, Q(rcube_label('timezone'))),
@@ -225,14 +211,30 @@ function rcmail_user_prefs($current=null)
       );
     }
 
-    // daylight savings
-    if (!isset($no_override['dst_active'])) {
-      $field_id = 'rcmfd_dst';
-      $input_dst = new html_checkbox(array('name' => '_dst_active', 'id' => $field_id, 'value' => 1, 'disabled' => ($config['timezone'] === 'auto')));
+    // date/time formatting
+    if (!isset($no_override['time_format'])) {
+      $reftime = mktime(7,30,0);
+      $field_id = 'rcmfd_time_format';
+      $select_time = new html_select(array('name' => '_time_format', 'id' => $field_id));
+      foreach ((array)$RCMAIL->config->get('time_formats', array('G:i', 'H:i', 'g:i a', 'h:i A')) as $choice)
+        $select_time->add(date($choice, $reftime), $choice);
 
-      $blocks['main']['options']['dstactive'] = array(
-        'title' => html::label($field_id, Q(rcube_label('dstactive'))),
-        'content' => $input_dst->show($config['dst_active']),
+      $blocks['main']['options']['time_format'] = array(
+        'title' => html::label($field_id, Q(rcube_label('timeformat'))),
+        'content' => $select_time->show($RCMAIL->config->get('time_format')),
+      );
+    }
+
+    if (!isset($no_override['date_format'])) {
+      $refdate = mktime(12,30,0,7,24);
+      $field_id = 'rcmfd_date_format';
+      $select_date = new html_select(array('name' => '_date_format', 'id' => $field_id));
+      foreach ((array)$RCMAIL->config->get('date_formats', array('Y-m-d','d-m-Y','Y/m/d','m/d/Y','d/m/Y','d.m.Y','j.n.Y')) as $choice)
+        $select_date->add(date($choice, $refdate), $choice);
+
+      $blocks['main']['options']['date_format'] = array(
+        'title' => html::label($field_id, Q(rcube_label('dateformat'))),
+        'content' => $select_date->show($config['date_format']),
       );
     }
 
@@ -244,17 +246,6 @@ function rcmail_user_prefs($current=null)
       $blocks['main']['options']['prettydate'] = array(
         'title' => html::label($field_id, Q(rcube_label('prettydate'))),
         'content' => $input_prettydate->show($config['prettydate']?1:0),
-      );
-    }
-
-    // show page size selection
-    if (!isset($no_override['pagesize'])) {
-      $field_id = 'rcmfd_pgsize';
-      $input_pagesize = new html_inputfield(array('name' => '_pagesize', 'id' => $field_id, 'size' => 5));
-
-      $blocks['list']['options']['pagesize'] = array(
-        'title' => html::label($field_id, Q(rcube_label('pagesize'))),
-        'content' => $input_pagesize->show($config['pagesize']),
       );
     }
 
@@ -276,6 +267,16 @@ function rcmail_user_prefs($current=null)
       }
     }
 
+    $product_name = $RCMAIL->config->get('product_name', 'Roundcube Webmail');
+    $RCMAIL->output->add_script(sprintf("%s.check_protocol_handler('%s', '#mailtoprotohandler');",
+      JS_OBJECT_NAME, JQ($product_name)), 'foot');
+
+    $blocks['browser']['options']['mailtoprotohandler'] = array(
+      'content' => html::a(array(
+        'href' => '#',
+        'id' => 'mailtoprotohandler'), Q(rcube_label('mailtoprotohandler'))),
+    );
+
     break;
 
     // Mailbox view (mail screen)
@@ -290,7 +291,7 @@ function rcmail_user_prefs($current=null)
     if (!isset($no_override['preview_pane'])) {
       $field_id = 'rcmfd_preview';
       $input_preview = new html_checkbox(array('name' => '_preview_pane', 'id' => $field_id, 'value' => 1,
-        'onchange' => JS_OBJECT_NAME.'.toggle_preview_pane(this)'));
+        'onchange' => "$('#rcmfd_preview_pane_mark_read').prop('disabled', !this.checked)"));
 
       $blocks['main']['options']['preview_pane'] = array(
         'title' => html::label($field_id, Q(rcube_label('previewpane'))),
@@ -333,8 +334,8 @@ function rcmail_user_prefs($current=null)
       );
     }
 
-    $RCMAIL->imap_connect();
-    $threading_supported = $RCMAIL->imap->get_capability('THREAD');
+    $storage             = $RCMAIL->get_storage();
+    $threading_supported = $storage->get_capability('THREAD');
 
     if (!isset($no_override['autoexpand_threads']) && $threading_supported) {
       $field_id = 'rcmfd_autoexpand_threads';
@@ -349,13 +350,16 @@ function rcmail_user_prefs($current=null)
       );
     }
 
-    if (!isset($no_override['focus_on_new_message'])) {
-      $field_id = 'rcmfd_focus_on_new_message';
-      $input_focus_on_new_message = new html_checkbox(array('name' => '_focus_on_new_message', 'id' => $field_id, 'value' => 1));
+    // show page size selection
+    if (!isset($no_override['mail_pagesize'])) {
+      $field_id = 'rcmfd_mail_pagesize';
+      $input_pagesize = new html_inputfield(array('name' => '_mail_pagesize', 'id' => $field_id, 'size' => 5));
 
-      $blocks['new_message']['options']['focus_on_new_message'] = array(
-        'title' => html::label($field_id, Q(rcube_label('focusonnewmessage'))),
-        'content' => $input_focus_on_new_message->show($config['focus_on_new_message']?1:0),
+      $size = intval($config['mail_pagesize'] ? $config['mail_pagesize'] : $config['pagesize']);
+
+      $blocks['main']['options']['pagesize'] = array(
+        'title' => html::label($field_id, Q(rcube_label('pagesize'))),
+        'content' => $input_pagesize->show($size ? $size : 50),
       );
     }
 
@@ -398,7 +402,7 @@ function rcmail_user_prefs($current=null)
     if (!isset($no_override['prefer_html'])) {
       $field_id = 'rcmfd_htmlmsg';
       $input_preferhtml = new html_checkbox(array('name' => '_prefer_html', 'id' => $field_id, 'value' => 1,
-        'onchange' => JS_OBJECT_NAME.'.toggle_prefer_html(this)'));
+        'onchange' => "$('#rcmfd_show_images').prop('disabled', !this.checked).val(0)"));
 
       $blocks['main']['options']['prefer_html'] = array(
         'title' => html::label($field_id, Q(rcube_label('preferhtml'))),
@@ -412,21 +416,22 @@ function rcmail_user_prefs($current=null)
       $blocks['main']['options']['default_charset'] = array(
         'title' => html::label($field_id, Q(rcube_label('defaultcharset'))),
         'content' => $RCMAIL->output->charset_selector(array(
-	  'name' => '_default_charset', 'selected' => $config['default_charset']
-	  ))
+          'name' => '_default_charset', 'selected' => $config['default_charset']
+        ))
       );
     }
 
     if (!isset($no_override['show_images'])) {
       $field_id = 'rcmfd_show_images';
-      $input_show_images = new html_select(array('name' => '_show_images', 'id' => $field_id));
+      $input_show_images = new html_select(array('name' => '_show_images', 'id' => $field_id,
+        'disabled' => !$config['prefer_html']));
       $input_show_images->add(rcube_label('never'), 0);
       $input_show_images->add(rcube_label('fromknownsenders'), 1);
       $input_show_images->add(rcube_label('always'), 2);
 
       $blocks['main']['options']['show_images'] = array(
         'title' => html::label($field_id, Q(rcube_label('showremoteimages'))),
-        'content' => $input_show_images->show($config['show_images']),
+        'content' => $input_show_images->show($config['prefer_html'] ? $config['show_images'] : 0),
       );
     }
 
@@ -457,11 +462,11 @@ function rcmail_user_prefs($current=null)
     case 'compose':
 
     $blocks = array(
-      'main' => array('name' => Q(rcube_label('mainoptions'))),
-      'sig' => array('name' => Q(rcube_label('signatureoptions'))),
+      'main'       => array('name' => Q(rcube_label('mainoptions'))),
+      'spellcheck' => array('name' => Q(rcube_label('spellcheckoptions'))),
+      'sig'        => array('name' => Q(rcube_label('signatureoptions'))),
     );
 
-    // Show checkbox for HTML Editor
     if (!isset($no_override['htmleditor'])) {
       $field_id = 'rcmfd_htmleditor';
       $select_htmleditor = new html_select(array('name' => '_htmleditor', 'id' => $field_id));
@@ -544,7 +549,8 @@ function rcmail_user_prefs($current=null)
 
     if (!isset($no_override['top_posting'])) {
       $field_id = 'rcmfd_top_posting';
-      $select_replymode = new html_select(array('name' => '_top_posting', 'id' => $field_id, 'onchange' => "\$('#rcmfd_sig_above').attr('disabled',this.selectedIndex==0)"));
+      $select_replymode = new html_select(array('name' => '_top_posting', 'id' => $field_id,
+        'onchange' => "\$('#rcmfd_sig_above').attr('disabled',this.selectedIndex==0)"));
       $select_replymode->add(rcube_label('replybottomposting'), 0);
       $select_replymode->add(rcube_label('replytopposting'), 1);
 
@@ -552,6 +558,30 @@ function rcmail_user_prefs($current=null)
         'title' => html::label($field_id, Q(rcube_label('whenreplying'))),
         'content' => $select_replymode->show($config['top_posting']?1:0),
       );
+    }
+
+    if (!isset($no_override['spellcheck_before_send']) && $config['enable_spellcheck']) {
+      $field_id = 'rcmfd_spellcheck_before_send';
+      $input_spellcheck = new html_checkbox(array('name' => '_spellcheck_before_send', 'id' => $field_id, 'value' => 1));
+
+      $blocks['spellcheck']['options']['spellcheck_before_send'] = array(
+        'title' => html::label($field_id, Q(rcube_label('spellcheckbeforesend'))),
+        'content' => $input_spellcheck->show($config['spellcheck_before_send']?1:0),
+      );
+    }
+
+    if ($config['enable_spellcheck']) {
+      foreach (array('syms', 'nums', 'caps') as $key) {
+        $key = 'spellcheck_ignore_'.$key;
+        if (!isset($no_override[$key])) {
+          $input_spellcheck = new html_checkbox(array('name' => '_'.$key, 'id' => 'rcmfd_'.$key, 'value' => 1));
+
+          $blocks['spellcheck']['options'][$key] = array(
+            'title' => html::label($field_id, Q(rcube_label(str_replace('_', '', $key)))),
+            'content' => $input_spellcheck->show($config[$key]?1:0),
+          );
+        }
+      }
     }
 
     if (!isset($no_override['show_sig'])) {
@@ -590,6 +620,115 @@ function rcmail_user_prefs($current=null)
       );
     }
 
+    if (!isset($no_override['forward_attachment'])) {
+      $field_id = 'rcmfd_forward_attachment';
+      $select = new html_select(array('name' => '_forward_attachment', 'id' => $field_id));
+      $select->add(rcube_label('inline'), 0);
+      $select->add(rcube_label('asattachment'), 1);
+
+      $blocks['main']['options']['forward_attachment'] = array(
+        'title' => html::label($field_id, Q(rcube_label('forwardmode'))),
+        'content' => $select->show(intval($config['forward_attachment'])),
+      );
+    }
+
+    if (!isset($no_override['default_font'])) {
+      $field_id     = 'rcmfd_default_font';
+      $fonts        = rcube_fontdefs();
+      $default_font = $config['default_font'] ? $config['default_font'] : 'Verdana';
+
+      $select = '<select name="_default_font" id="'.$field_id.'">';
+      foreach ($fonts as $fname => $font)
+        $select .= '<option value="'.$fname.'"'
+          . ($fname == $default_font ? ' selected="selected"' : '')
+          . ' style=\'font-family: ' . $font . '\'>'
+          . Q($fname) . '</option>';
+      $select .= '</select>';
+
+      $blocks['main']['options']['default_font'] = array(
+        'title' => html::label($field_id, Q(rcube_label('defaultfont'))),
+        'content' => $select
+      );
+    }
+
+    break;
+
+
+    // Addressbook config
+    case 'addressbook':
+
+    $blocks = array(
+      'main' => array('name' => Q(rcube_label('mainoptions'))),
+    );
+
+    if (!isset($no_override['default_addressbook'])
+      && ($books = $RCMAIL->get_address_sources(true))
+    ) {
+      $field_id = 'rcmfd_default_addressbook';
+      $select_abook = new html_select(array('name' => '_default_addressbook', 'id' => $field_id));
+
+      foreach ($books as $book) {
+        $select_abook->add($book['name'], $book['id']);
+      }
+
+      $blocks['main']['options']['default_addressbook'] = array(
+        'title' => html::label($field_id, Q(rcube_label('defaultaddressbook'))),
+        'content' => $select_abook->show($config['default_addressbook']),
+      );
+    }
+
+    // show addressbook listing mode selection
+    if (!isset($no_override['addressbook_name_listing'])) {
+      $field_id = 'rcmfd_addressbook_name_listing';
+      $select_listing = new html_select(array('name' => '_addressbook_name_listing', 'id' => $field_id));
+      $select_listing->add(rcube_label('name'), 0);
+      $select_listing->add(rcube_label('firstname') . ' '  . rcube_label('surname'), 1);
+      $select_listing->add(rcube_label('surname')   . ' '  . rcube_label('firstname'), 2);
+      $select_listing->add(rcube_label('surname')   . ', ' . rcube_label('firstname'), 3);
+
+      $blocks['main']['options']['list_name_listing'] = array(
+        'title' => html::label($field_id, Q(rcube_label('listnamedisplay'))),
+        'content' => $select_listing->show($config['addressbook_name_listing']),
+      );
+    }
+
+    // show addressbook sort column
+    if (!isset($no_override['addressbook_sort_col'])) {
+      $field_id = 'rcmfd_addressbook_sort_col';
+      $select_sort = new html_select(array('name' => '_addressbook_sort_col', 'id' => $field_id));
+      $select_sort->add(rcube_label('name'), 'name');
+      $select_sort->add(rcube_label('firstname'), 'firstname');
+      $select_sort->add(rcube_label('surname'), 'surname');
+
+      $blocks['main']['options']['sort_col'] = array(
+        'title' => html::label($field_id, Q(rcube_label('listsorting'))),
+        'content' => $select_sort->show($config['addressbook_sort_col']),
+      );
+    }
+
+    // show addressbook page size selection
+    if (!isset($no_override['addressbook_pagesize'])) {
+      $field_id = 'rcmfd_addressbook_pagesize';
+      $input_pagesize = new html_inputfield(array('name' => '_addressbook_pagesize', 'id' => $field_id, 'size' => 5));
+
+      $size = intval($config['addressbook_pagesize'] ? $config['addressbook_pagesize'] : $config['pagesize']);
+
+      $blocks['main']['options']['pagesize'] = array(
+        'title' => html::label($field_id, Q(rcube_label('pagesize'))),
+        'content' => $input_pagesize->show($size ? $size : 50),
+      );
+    }
+
+    if (!isset($no_override['autocomplete_single'])) {
+      $field_id = 'rcmfd_autocomplete_single';
+      $checkbox = new html_checkbox(array('name' => '_autocomplete_single', 'id' => $field_id, 'value' => 1));
+
+      $blocks['main']['options']['autocomplete_single'] = array(
+        'title' => html::label($field_id, Q(rcube_label('autocompletesingle'))),
+        'content' => $checkbox->show($config['autocomplete_single']?1:0),
+      );
+    }
+
     break;
 
     // Special IMAP folders
@@ -600,14 +739,18 @@ function rcmail_user_prefs($current=null)
     );
 
     // Configure special folders
-    if (!isset($no_override['default_imap_folders'])) {
-
-      $RCMAIL->imap_connect();
-
+    if (!isset($no_override['default_folders'])) {
       // load folders list only when needed
       if ($current) {
-        $select = rcmail_mailbox_select(array('noselection' => '---', 'realnames' => true,
-          'maxlength' => 30, 'exceptions' => array('INBOX')));
+        $select = rcmail_mailbox_select(array(
+          'noselection'   => '---',
+          'realnames'     => true,
+          'maxlength'     => 30,
+          'folder_filter' => 'mail',
+          'folder_rights' => 'w',
+          // #1486114, #1488279
+          'onchange'      => "if ($(this).val() == 'INBOX') $(this).val('')",
+        ));
       }
       else // dummy select
         $select = new html_select();
@@ -688,6 +831,16 @@ function rcmail_user_prefs($current=null)
       );
     }
 
+    if (!isset($no_override['delete_junk'])) {
+      $field_id = 'rcmfd_delete_junk';
+      $input_delete_junk = new html_checkbox(array('name' => '_delete_junk', 'id' => $field_id, 'value' => 1));
+
+      $blocks['main']['options']['delete_junk'] = array(
+        'title' => html::label($field_id, Q(rcube_label('deletejunk'))),
+        'content' => $input_delete_junk->show($config['delete_junk']?1:0),
+      );
+    }
+
     // Trash purging on logout
     if (!isset($no_override['logout_purge'])) {
       $field_id = 'rcmfd_logout_purge';
@@ -756,6 +909,51 @@ function rcmail_get_skins()
   return $skins;
 }
 
+
+function rcmail_folder_options($mailbox)
+{
+    global $RCMAIL;
+
+    $options = $RCMAIL->get_storage()->folder_info($mailbox);
+    $options['protected'] = $options['is_root'] || ($options['special'] && $RCMAIL->config->get('protect_default_folders'));
+
+    return $options;
+}
+
+/**
+ * Updates (or creates) folder row in the subscriptions table
+ *
+ * @param string $name      Folder name
+ * @param string $oldname   Old folder name (for update)
+ * @param bool   $subscribe Checks subscription checkbox
+ * @param string $class     CSS class name for folder row
+ */
+function rcmail_update_folder_row($name, $oldname=null, $subscribe=false, $class_name=null)
+{
+    global $RCMAIL, $OUTPUT;
+
+    $default_folders = (array) $RCMAIL->config->get('default_folders');
+    $protect_folders = $RCMAIL->config->get('protect_default_folders');
+
+    $storage      = $RCMAIL->get_storage();
+    $delimiter    = $storage->get_hierarchy_delimiter();
+    $name_utf8    = rcube_charset_convert($name, 'UTF7-IMAP');
+    $protected    = $protect_folders && in_array($name, $default_folders);
+
+    $foldersplit  = explode($delimiter, $storage->mod_folder($name));
+    $level        = count($foldersplit) - 1;
+    $display_name = str_repeat('&nbsp;&nbsp;&nbsp;&nbsp;', $level)
+        . Q($protected ? rcmail_localize_foldername($name) : rcube_charset_convert($foldersplit[$level], 'UTF7-IMAP'));
+
+    if ($oldname === null)
+        $OUTPUT->command('add_folder_row', $name_utf8, $display_name, $protected, $subscribe,
+            false, $class_name);
+    else
+        $OUTPUT->command('replace_folder_row', rcube_charset_convert($oldname, 'UTF7-IMAP'),
+            $name_utf8, $display_name, $protected, $class_name);
+}
+
+
 // register UI objects
 $OUTPUT->add_handlers(array(
   'prefsframe' => 'rcmail_preferences_frame',
@@ -763,3 +961,14 @@ $OUTPUT->add_handlers(array(
   'identitieslist' => 'rcmail_identities_list',
 ));
 
+// register action aliases
+$RCMAIL->register_action_map(array(
+    'folders'       => 'folders.inc',
+    'rename-folder' => 'folders.inc',
+    'delete-folder' => 'folders.inc',
+    'subscribe'     => 'folders.inc',
+    'unsubscribe'   => 'folders.inc',
+    'purge'         => 'folders.inc',
+    'folder-size'   => 'folders.inc',
+    'add-identity'  => 'edit_identity.inc',
+));

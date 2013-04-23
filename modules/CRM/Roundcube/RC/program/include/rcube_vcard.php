@@ -5,8 +5,11 @@
  | program/include/rcube_vcard.php                                       |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2008-2009, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2008-2011, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Logical representation of a vcard address record                    |
@@ -14,7 +17,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: rcube_vcard.php 4393 2011-01-04 22:00:35Z thomasb $
+ $Id$
 
 */
 
@@ -33,6 +36,27 @@ class rcube_vcard
     'FN' => array(),
     'N' => array(array('','','','','')),
   );
+  private static $fieldmap = array(
+    'phone'    => 'TEL',
+    'birthday' => 'BDAY',
+    'website'  => 'URL',
+    'notes'    => 'NOTE',
+    'email'    => 'EMAIL',
+    'address'  => 'ADR',
+    'jobtitle' => 'TITLE',
+    'department'  => 'X-DEPARTMENT',
+    'gender'      => 'X-GENDER',
+    'maidenname'  => 'X-MAIDENNAME',
+    'anniversary' => 'X-ANNIVERSARY',
+    'assistant'   => 'X-ASSISTANT',
+    'manager'     => 'X-MANAGER',
+    'spouse'      => 'X-SPOUSE',
+    'edit'        => 'X-AB-EDIT',
+  );
+  private $typemap = array('IPHONE' => 'mobile', 'CELL' => 'mobile', 'WORK,FAX' => 'workfax');
+  private $phonetypemap = array('HOME1' => 'HOME', 'BUSINESS1' => 'WORK', 'BUSINESS2' => 'WORK2', 'BUSINESSFAX' => 'WORK,FAX');
+  private $addresstypemap = array('BUSINESS' => 'WORK');
+  private $immap = array('X-JABBER' => 'jabber', 'X-ICQ' => 'icq', 'X-MSN' => 'msn', 'X-AIM' => 'aim', 'X-YAHOO' => 'yahoo', 'X-SKYPE' => 'skype', 'X-SKYPE-USERNAME' => 'skype');
 
   public $business = false;
   public $displayname;
@@ -44,12 +68,16 @@ class rcube_vcard
   public $notes;
   public $email = array();
 
+  public static $eol = "\r\n";
 
   /**
    * Constructor
    */
-  public function __construct($vcard = null, $charset = RCMAIL_CHARSET, $detect = false)
+  public function __construct($vcard = null, $charset = RCMAIL_CHARSET, $detect = false, $fieldmap = array())
   {
+    if (!empty($fielmap))
+      $this->extend_fieldmap($fieldmap);
+
     if (!empty($vcard))
       $this->load($vcard, $charset, $detect);
   }
@@ -76,6 +104,10 @@ class rcube_vcard
       ($detected_charset = self::detect_encoding(self::vcard_encode($this->raw))) && $detected_charset != RCMAIL_CHARSET) {
         $this->raw = self::charset_convert($this->raw, $detected_charset);
     }
+    
+    // consider FN empty if the same as the primary e-mail address
+    if ($this->raw['FN'][0][0] == $this->raw['EMAIL'][0][0])
+      $this->raw['FN'][0][0] = '';
 
     // find well-known address fields
     $this->displayname = $this->raw['FN'][0][0];
@@ -85,10 +117,10 @@ class rcube_vcard
     $this->nickname = $this->raw['NICKNAME'][0][0];
     $this->organization = $this->raw['ORG'][0][0];
     $this->business = ($this->raw['X-ABSHOWAS'][0][0] == 'COMPANY') || (join('', (array)$this->raw['N'][0]) == '' && !empty($this->organization));
-    
+
     foreach ((array)$this->raw['EMAIL'] as $i => $raw_email)
       $this->email[$i] = is_array($raw_email) ? $raw_email[0] : $raw_email;
-    
+
     // make the pref e-mail address the first entry in $this->email
     $pref_index = $this->get_type_index('EMAIL', 'pref');
     if ($pref_index > 0) {
@@ -96,22 +128,134 @@ class rcube_vcard
       $this->email[0] = $this->email[$pref_index];
       $this->email[$pref_index] = $tmp;
     }
+  }
 
-    // make sure displayname is not empty (required by RFC2426)
-    if (!strlen($this->displayname)) {
-      // the same method is used in steps/mail/addcontact.inc
-      $this->displayname = ucfirst(preg_replace('/[\.\-]/', ' ',
-        substr($this->email[0], 0, strpos($this->email[0], '@'))));
+
+  /**
+   * Return vCard data as associative array to be unsed in Roundcube address books
+   *
+   * @return array Hash array with key-value pairs
+   */
+  public function get_assoc()
+  {
+    $out = array('name' => $this->displayname);
+    $typemap = $this->typemap;
+
+    // copy name fields to output array
+    foreach (array('firstname','surname','middlename','nickname','organization') as $col) {
+      if (strlen($this->$col))
+        $out[$col] = $this->$col;
     }
+
+    if ($this->raw['N'][0][3])
+      $out['prefix'] = $this->raw['N'][0][3];
+    if ($this->raw['N'][0][4])
+      $out['suffix'] = $this->raw['N'][0][4];
+
+    // convert from raw vcard data into associative data for Roundcube
+    foreach (array_flip(self::$fieldmap) as $tag => $col) {
+      foreach ((array)$this->raw[$tag] as $i => $raw) {
+        if (is_array($raw)) {
+          $k = -1;
+          $key = $col;
+          $subtype = '';
+
+          if (!empty($raw['type'])) {
+            $combined = join(',', self::array_filter((array)$raw['type'], 'internet,pref', true));
+            $combined = strtoupper($combined);
+
+            if ($typemap[$combined]) {
+                $subtype = $typemap[$combined];
+            }
+            else if ($typemap[$raw['type'][++$k]]) {
+                $subtype = $typemap[$raw['type'][$k]];
+            }
+            else {
+                $subtype = strtolower($raw['type'][$k]);
+            }
+
+            while ($k < count($raw['type']) && ($subtype == 'internet' || $subtype == 'pref'))
+              $subtype = $typemap[$raw['type'][++$k]] ? $typemap[$raw['type'][$k]] : strtolower($raw['type'][$k]);
+          }
+
+          // read vcard 2.1 subtype
+          if (!$subtype) {
+            foreach ($raw as $k => $v) {
+              if (!is_numeric($k) && $v === true && ($k = strtolower($k))
+                && !in_array($k, array('pref','internet','voice','base64'))
+              ) {
+                $k_uc    = strtoupper($k);
+                $subtype = $typemap[$k_uc] ? $typemap[$k_uc] : $k;
+                break;
+              }
+            }
+          }
+
+          // force subtype if none set
+          if (!$subtype && preg_match('/^(email|phone|address|website)/', $key))
+            $subtype = 'other';
+
+          if ($subtype)
+            $key .= ':' . $subtype;
+
+          // split ADR values into assoc array
+          if ($tag == 'ADR') {
+            list(,, $value['street'], $value['locality'], $value['region'], $value['zipcode'], $value['country']) = $raw;
+            $out[$key][] = $value;
+          }
+          else
+            $out[$key][] = $raw[0];
+        }
+        else {
+          $out[$col][] = $raw;
+        }
+      }
+    }
+
+    // handle special IM fields as used by Apple
+    foreach ($this->immap as $tag => $type) {
+      foreach ((array)$this->raw[$tag] as $i => $raw) {
+        $out['im:'.$type][] = $raw[0];
+      }
+    }
+
+    // copy photo data
+    if ($this->raw['PHOTO'])
+      $out['photo'] = $this->raw['PHOTO'][0][0];
+
+    return $out;
   }
 
 
   /**
    * Convert the data structure into a vcard 3.0 string
    */
-  public function export()
+  public function export($folded = true)
   {
-    return self::rfc2425_fold(self::vcard_encode($this->raw));
+    $vcard = self::vcard_encode($this->raw);
+    return $folded ? self::rfc2425_fold($vcard) : $vcard;
+  }
+
+
+  /**
+   * Clear the given fields in the loaded vcard data
+   *
+   * @param array List of field names to be reset
+   */
+  public function reset($fields = null)
+  {
+    if (!$fields)
+      $fields = array_merge(array_values(self::$fieldmap), array_keys($this->immap), array('FN','N','ORG','NICKNAME','EMAIL','ADR','BDAY'));
+
+    foreach ($fields as $f)
+      unset($this->raw[$f]);
+
+    if (!$this->raw['N'])
+      $this->raw['N'] = array(array('','','','',''));
+    if (!$this->raw['FN'])
+      $this->raw['FN'] = array();
+
+    $this->email = array();
   }
 
 
@@ -120,42 +264,111 @@ class rcube_vcard
    *
    * @param string Field name
    * @param string Field value
-   * @param string Section name
+   * @param string Type/section name
    */
-  public function set($field, $value, $section = 'HOME')
+  public function set($field, $value, $type = 'HOME')
   {
+    $field = strtolower($field);
+    $type_uc = strtoupper($type);
+    $typemap = array_flip($this->typemap);
+
     switch ($field) {
       case 'name':
       case 'displayname':
         $this->raw['FN'][0][0] = $value;
         break;
-        
-      case 'firstname':
-        $this->raw['N'][0][1] = $value;
-        break;
-        
+
       case 'surname':
         $this->raw['N'][0][0] = $value;
         break;
-      
+
+      case 'firstname':
+        $this->raw['N'][0][1] = $value;
+        break;
+
+      case 'middlename':
+        $this->raw['N'][0][2] = $value;
+        break;
+
+      case 'prefix':
+        $this->raw['N'][0][3] = $value;
+        break;
+
+      case 'suffix':
+        $this->raw['N'][0][4] = $value;
+        break;
+
       case 'nickname':
         $this->raw['NICKNAME'][0][0] = $value;
         break;
-        
+
       case 'organization':
         $this->raw['ORG'][0][0] = $value;
         break;
-        
-      case 'email':
-        $index = $this->get_type_index('EMAIL', $section);
-        if (!is_array($this->raw['EMAIL'][$index])) {
-          $this->raw['EMAIL'][$index] = array(0 => $value, 'type' => array('INTERNET', $section, 'pref'));
+
+      case 'photo':
+        if (strpos($value, 'http:') === 0) {
+            // TODO: fetch file from URL and save it locally?
+            $this->raw['PHOTO'][0] = array(0 => $value, 'url' => true);
         }
         else {
-          $this->raw['EMAIL'][$index][0] = $value;
+            $this->raw['PHOTO'][0] = array(0 => $value, 'base64' => (bool) preg_match('![^a-z0-9/=+-]!i', $value));
+        }
+        break;
+
+      case 'email':
+        $this->raw['EMAIL'][] = array(0 => $value, 'type' => array_filter(array('INTERNET', $type_uc)));
+        $this->email[] = $value;
+        break;
+
+      case 'im':
+        // save IM subtypes into extension fields
+        $typemap = array_flip($this->immap);
+        if ($field = $typemap[strtolower($type)])
+          $this->raw[$field][] = array(0 => $value);
+        break;
+
+      case 'birthday':
+      case 'anniversary':
+        if (($val = rcube_strtotime($value)) && ($fn = self::$fieldmap[$field]))
+          $this->raw[$fn][] = array(0 => date('Y-m-d', $val), 'value' => array('date'));
+        break;
+
+      case 'address':
+        if ($this->addresstypemap[$type_uc])
+          $type = $this->addresstypemap[$type_uc];
+
+        $value = $value[0] ? $value : array('', '', $value['street'], $value['locality'], $value['region'], $value['zipcode'], $value['country']);
+
+        // fall through if not empty
+        if (!strlen(join('', $value)))
+          break;
+
+      default:
+        if ($field == 'phone' && $this->phonetypemap[$type_uc])
+          $type = $this->phonetypemap[$type_uc];
+
+        if (($tag = self::$fieldmap[$field]) && (is_array($value) || strlen($value))) {
+          $index = count($this->raw[$tag]);
+          $this->raw[$tag][$index] = (array)$value;
+          if ($type)
+            $this->raw[$tag][$index]['type'] = explode(',', ($typemap[$type_uc] ? $typemap[$type_uc] : $type));
         }
         break;
     }
+  }
+
+  /**
+   * Setter for individual vcard properties
+   *
+   * @param string VCard tag name
+   * @param array Value-set of this vcard property
+   * @param boolean Set to true if the value-set should be appended instead of replacing any existing value-set
+   */
+  public function set_raw($tag, $value, $append = false)
+  {
+    $index = $append ? count($this->raw[$tag]) : 0;
+    $this->raw[$tag][$index] = (array)$value;
   }
 
 
@@ -174,11 +387,11 @@ class rcube_vcard
           $result = $i;
       }
     }
-    
+
     return $result;
   }
-  
-  
+
+
   /**
    * Convert a whole vcard (array) to UTF-8.
    * If $force_charset is null, each member value that has a charset parameter will be converted
@@ -198,6 +411,16 @@ class rcube_vcard
     }
 
     return $card;
+  }
+
+
+  /**
+   * Extends fieldmap definition
+   */
+  public function extend_fieldmap($map)
+  {
+    if (is_array($map))
+      self::$fieldmap = array_merge($map, self::$fieldmap);
   }
 
 
@@ -232,8 +455,8 @@ class rcube_vcard
 
       if (preg_match('/^END:VCARD$/i', $line)) {
         // parse vcard
-        $obj = new rcube_vcard(self::cleanup($vcard_block), $charset, true);
-        if (!empty($obj->displayname))
+        $obj = new rcube_vcard(self::cleanup($vcard_block), $charset, true, self::$fieldmap);
+        if (!empty($obj->displayname) || !empty($obj->email))
           $out[] = $obj;
 
         $in_vcard_block = false;
@@ -258,12 +481,24 @@ class rcube_vcard
   {
     // Convert special types (like Skype) to normal type='skype' classes with this simple regex ;)
     $vcard = preg_replace(
-      '/item(\d+)\.(TEL|URL)([^:]*?):(.*?)item\1.X-ABLabel:(?:_\$!<)?([\w-() ]*)(?:>!\$_)?./s',
+      '/item(\d+)\.(TEL|EMAIL|URL)([^:]*?):(.*?)item\1.X-ABLabel:(?:_\$!<)?([\w-() ]*)(?:>!\$_)?./s',
       '\2;type=\5\3:\4',
+      $vcard);
+
+    // convert Apple X-ABRELATEDNAMES into X-* fields for better compatibility
+    $vcard = preg_replace_callback(
+      '/item(\d+)\.(X-ABRELATEDNAMES)([^:]*?):(.*?)item\1.X-ABLabel:(?:_\$!<)?([\w-() ]*)(?:>!\$_)?./s',
+      array('self', 'x_abrelatednames_callback'),
       $vcard);
 
     // Remove cruft like item1.X-AB*, item1.ADR instead of ADR, and empty lines
     $vcard = preg_replace(array('/^item\d*\.X-AB.*$/m', '/^item\d*\./m', "/\n+/"), array('', '', "\n"), $vcard);
+
+    // convert X-WAB-GENDER to X-GENDER
+    if (preg_match('/X-WAB-GENDER:(\d)/', $vcard, $matches)) {
+      $value = $matches[1] == '2' ? 'male' : 'female';
+      $vcard = preg_replace('/X-WAB-GENDER:\d/', 'X-GENDER:' . $value, $vcard);
+    }
 
     // if N doesn't have any semicolons, add some 
     $vcard = preg_replace('/^(N:[^;\R]*)$/m', '\1;;;;', $vcard);
@@ -271,14 +506,32 @@ class rcube_vcard
     return $vcard;
   }
 
-  private static function rfc2425_fold_callback($matches)
+  private static function x_abrelatednames_callback($matches)
   {
-    return ":\n  ".rtrim(chunk_split($matches[1], 72, "\n  "));
+    return 'X-' . strtoupper($matches[5]) . $matches[3] . ':'. $matches[4];
   }
 
-  private static function rfc2425_fold($val)
+  private static function rfc2425_fold_callback($matches)
   {
-    return preg_replace_callback('/:([^\n]{72,})/', array('self', 'rfc2425_fold_callback'), $val) . "\n";
+    // chunk_split string and avoid lines breaking multibyte characters
+    $c = 71;
+    $out .= substr($matches[1], 0, $c);
+    for ($n = $c; $c < strlen($matches[1]); $c++) {
+      // break if length > 75 or mutlibyte character starts after position 71
+      if ($n > 75 || ($n > 71 && ord($matches[1][$c]) >> 6 == 3)) {
+        $out .= "\r\n ";
+        $n = 0;
+      }
+      $out .= $matches[1][$c];
+      $n++;
+    }
+
+    return $out;
+  }
+
+  public static function rfc2425_fold($val)
+  {
+    return preg_replace_callback('/([^\n]{72,})/', array('self', 'rfc2425_fold_callback'), $val);
   }
 
 
@@ -291,15 +544,17 @@ class rcube_vcard
    */
   private static function vcard_decode($vcard)
   {
-    // Perform RFC2425 line unfolding
+    // Perform RFC2425 line unfolding and split lines
     $vcard = preg_replace(array("/\r/", "/\n\s+/"), '', $vcard);
-    
-    $lines = preg_split('/\r?\n/', $vcard);
-    $data = array();
-    
+    $lines = explode("\n", $vcard);
+    $data  = array();
+
     for ($i=0; $i < count($lines); $i++) {
-      if (!preg_match('/^([^\\:]*):(.+)$/', $lines[$i], $line))
-          continue;
+      if (!preg_match('/^([^:]+):(.+)$/', $lines[$i], $line))
+        continue;
+
+      if (preg_match('/^(BEGIN|END)$/i', $line[1]))
+        continue;
 
       // convert 2.1-style "EMAIL;internet;home:" to 3.0-style "EMAIL;TYPE=internet;TYPE=home:"
       if (($data['VERSION'][0] == "2.1") && preg_match('/^([^;]+);([^:]+)/', $line[1], $regs2) && !preg_match('/^TYPE=/i', $regs2[2])) {
@@ -308,57 +563,55 @@ class rcube_vcard
           $line[1] .= ';' . (strpos($prop, '=') ? $prop : 'TYPE='.$prop);
       }
 
-      if (!preg_match('/^(BEGIN|END)$/i', $line[1]) && preg_match_all('/([^\\;]+);?/', $line[1], $regs2)) {
+      if (preg_match_all('/([^\\;]+);?/', $line[1], $regs2)) {
         $entry = array();
         $field = strtoupper($regs2[1][0]);
+        $enc   = null;
 
         foreach($regs2[1] as $attrid => $attr) {
           if ((list($key, $value) = explode('=', $attr)) && $value) {
             $value = trim($value);
             if ($key == 'ENCODING') {
+              $value = strtoupper($value);
               // add next line(s) to value string if QP line end detected
-              while ($value == 'QUOTED-PRINTABLE' && preg_match('/=$/', $lines[$i]))
+              if ($value == 'QUOTED-PRINTABLE') {
+                while (preg_match('/=$/', $lines[$i]))
                   $line[2] .= "\n" . $lines[++$i];
-              
-              $line[2] = self::decode_value($line[2], $value);
+              }
+              $enc = $value;
             }
-            else
-              $entry[strtolower($key)] = array_merge((array)$entry[strtolower($key)], (array)self::vcard_unquote($value, ','));
+            else {
+              $lc_key = strtolower($key);
+              $entry[$lc_key] = array_merge((array)$entry[$lc_key], (array)self::vcard_unquote($value, ','));
+            }
           }
           else if ($attrid > 0) {
-            $entry[$key] = true;  // true means attr without =value
+            $entry[strtolower($key)] = true;  // true means attr without =value
           }
         }
 
-        $entry = array_merge($entry, (array)self::vcard_unquote($line[2]));
+        // decode value
+        if ($enc || !empty($entry['base64'])) {
+          // save encoding type (#1488432)
+          if ($enc == 'B') {
+            $entry['encoding'] = 'B';
+            // should we use vCard 3.0 instead?
+            // $entry['base64'] = true;
+          }
+          $line[2] = self::decode_value($line[2], $enc ? $enc : 'base64');
+        }
+
+        if ($enc != 'B' && empty($entry['base64'])) {
+          $line[2] = self::vcard_unquote($line[2]);
+        }
+
+        $entry = array_merge($entry, (array) $line[2]);
         $data[$field][] = $entry;
       }
     }
 
     unset($data['VERSION']);
     return $data;
-  }
-
-
-  /**
-   * Split quoted string
-   *
-   * @param string vCard string to split
-   * @param string Separator char/string
-   * @return array List with splitted values
-   */
-  private static function vcard_unquote($s, $sep = ';')
-  {
-    // break string into parts separated by $sep, but leave escaped $sep alone
-    if (count($parts = explode($sep, strtr($s, array("\\$sep" => "\007")))) > 1) {
-      foreach($parts as $s) {
-        $result[] = self::vcard_unquote(strtr($s, array("\007" => "\\$sep")), $sep);
-      }
-      return $result;
-    }
-    else {
-      return strtr($s, array("\r" => '', '\\\\' => '\\', '\n' => "\n", '\,' => ',', '\;' => ';', '\:' => ':'));
-    }
   }
 
 
@@ -377,6 +630,7 @@ class rcube_vcard
         return quoted_printable_decode($value);
 
       case 'base64':
+      case 'b':
         self::$values_decoded = true;
         return base64_decode($value);
 
@@ -399,18 +653,29 @@ class rcube_vcard
       while ($type == "N" && is_array($entries[0]) && count($entries[0]) < 5)
         $entries[0][] = "";
 
+      // make sure FN is not empty (required by RFC2426)
+      if ($type == "FN" && empty($entries))
+        $entries[0] = $data['EMAIL'][0][0];
+
       foreach((array)$entries as $entry) {
         $attr = '';
         if (is_array($entry)) {
           $value = array();
           foreach($entry as $attrname => $attrvalues) {
-            if (is_int($attrname))
+            if (is_int($attrname)) {
+              if (!empty($entry['base64']) || $entry['encoding'] == 'B') {
+                $attrvalues = base64_encode($attrvalues);
+              }
               $value[] = $attrvalues;
-            elseif ($attrvalues === true)
-              $attr .= ";$attrname";    // true means just tag, not tag=value, as in PHOTO;BASE64:...
+            }
+            else if (is_bool($attrvalues)) {
+              if ($attrvalues) {
+                $attr .= strtoupper(";$attrname");    // true means just tag, not tag=value, as in PHOTO;BASE64:...
+              }
+            }
             else {
               foreach((array)$attrvalues as $attrvalue)
-                $attr .= ";$attrname=" . self::vcard_quote($attrvalue, ',');
+                $attr .= strtoupper(";$attrname=") . self::vcard_quote($attrvalue, ',');
             }
           }
         }
@@ -418,11 +683,15 @@ class rcube_vcard
           $value = $entry;
         }
 
-        $vcard .= self::vcard_quote($type) . $attr . ':' . self::vcard_quote($value) . "\n";
+        // skip empty entries
+        if (self::is_empty($value))
+          continue;
+
+        $vcard .= self::vcard_quote($type) . $attr . ':' . self::vcard_quote($value) . self::$eol;
       }
     }
 
-    return "BEGIN:VCARD\nVERSION:3.0\n{$vcard}END:VCARD";
+    return 'BEGIN:VCARD' . self::$eol . 'VERSION:3.0' . self::$eol . $vcard . 'END:VCARD';
   }
 
 
@@ -442,10 +711,73 @@ class rcube_vcard
       return(implode($sep, (array)$r));
     }
     else {
-      return strtr($s, array('\\' => '\\\\', "\r" => '', "\n" => '\n', ';' => '\;', ':' => '\:'));
+      return strtr($s, array('\\' => '\\\\', "\r" => '', "\n" => '\n', ',' => '\,', ';' => '\;'));
     }
   }
 
+
+  /**
+   * Split quoted string
+   *
+   * @param string vCard string to split
+   * @param string Separator char/string
+   * @return array List with splitted values
+   */
+  private static function vcard_unquote($s, $sep = ';')
+  {
+    // break string into parts separated by $sep, but leave escaped $sep alone
+    if (count($parts = explode($sep, strtr($s, array("\\$sep" => "\007")))) > 1) {
+      foreach($parts as $s) {
+        $result[] = self::vcard_unquote(strtr($s, array("\007" => "\\$sep")), $sep);
+      }
+      return $result;
+    }
+    else {
+      return strtr($s, array("\r" => '', '\\\\' => '\\', '\n' => "\n", '\N' => "\n", '\,' => ',', '\;' => ';', '\:' => ':'));
+    }
+  }
+
+
+  /**
+   * Check if vCard entry is empty: empty string or an array with
+   * all entries empty.
+   *
+   * @param mixed $value Attribute value (string or array)
+   *
+   * @return bool True if the value is empty, False otherwise
+   */
+  private static function is_empty($value)
+  {
+    foreach ((array)$value as $v) {
+      if (((string)$v) !== '') {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Extract array values by a filter
+   *
+   * @param array Array to filter
+   * @param keys Array or comma separated list of values to keep
+   * @param boolean Invert key selection: remove the listed values
+   * @return array The filtered array
+   */
+  private static function array_filter($arr, $values, $inverse = false)
+  {
+    if (!is_array($values))
+      $values = explode(',', $values);
+
+    $result = array();
+    $keep = array_flip((array)$values);
+    foreach ($arr as $key => $val)
+      if ($inverse != isset($keep[strtolower($val)]))
+        $result[$key] = $val;
+
+    return $result;
+  }
 
   /**
    * Returns UNICODE type based on BOM (Byte Order Mark)
@@ -460,6 +792,12 @@ class rcube_vcard
     if (substr($string, 0, 2) == "\xFE\xFF")     return 'UTF-16BE';  // Big Endian
     if (substr($string, 0, 2) == "\xFF\xFE")     return 'UTF-16LE';  // Little Endian
     if (substr($string, 0, 3) == "\xEF\xBB\xBF") return 'UTF-8';
+
+    // heuristics
+    if ($string[0] == "\0" && $string[1] == "\0" && $string[2] == "\0" && $string[3] != "\0") return 'UTF-32BE';
+    if ($string[0] != "\0" && $string[1] == "\0" && $string[2] == "\0" && $string[3] == "\0") return 'UTF-32LE';
+    if ($string[0] == "\0" && $string[1] != "\0" && $string[2] == "\0" && $string[3] != "\0") return 'UTF-16BE';
+    if ($string[0] != "\0" && $string[1] == "\0" && $string[2] != "\0" && $string[3] == "\0") return 'UTF-16LE';
 
     // use mb_detect_encoding()
     $encodings = array('UTF-8', 'ISO-8859-1', 'ISO-8859-2', 'ISO-8859-3',
@@ -488,5 +826,3 @@ class rcube_vcard
   }
 
 }
-
-

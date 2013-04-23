@@ -14,9 +14,10 @@
 defined("_VALID_ACCESS") || die('Direct access forbidden');
 
 class Base_User_Login extends Module {
-	private $theme;
+	public $theme;
 
 	public function construct() {
+		$this->theme = $this->pack_module('Base/Theme');
 	}
 
 	private function autologin() {
@@ -27,25 +28,19 @@ class Base_User_Login extends Module {
 		return false;
 	}
 
-	public function body() {
+	public function body($tpl=null) {
 		//check bans
-		$t = Variable::get('host_ban_time');
-		if($t>0) {
-			$fails = DB::GetOne('SELECT count(*) FROM user_login_ban WHERE failed_on>%d AND from_addr=%s',array(time()-$t,$_SERVER['REMOTE_ADDR']));
-			if($fails>=3) {
-				print __('You have exceeded the number of allowed login attempts.').'<br>';
-				print('<a href="'.get_epesi_url().'">'.__('Host banned. Click here to refresh.').'</a>');
-				return;
-			}
+        if (!Acl::is_user() && Base_User_LoginCommon::is_banned()) {
+            print __('You have exceeded the number of allowed login attempts.').'<br>';
+            print('<a href="'.get_epesi_url().'">'.__('Host banned. Click here to refresh.').'</a>');
+            return;
 		}
-
-		$this->theme = $this->pack_module('Base/Theme');
 
 		//if logged
 		$this->theme->assign('is_logged_in', Acl::is_user());
 		$this->theme->assign('is_demo', DEMO_MODE);
 		if (SUGGEST_DONATION) {
-			$this->theme->assign('donation_note', __('If you find our software useful, please support us by making a %s.<br>Your funding will help to ensure continued development of this project.', array('<a href="http://epe.si/cost" target="_blank">'.__('donation').'</a>')));
+			$this->theme->assign('donation_note', __('If you find our software useful, please support us by making a %s.', array('<a href="http://epe.si/cost" target="_blank">'.__('donation').'</a>')).'<br>'.__('Your funding will help to ensure continued development of this project.'));
 		}
 		if(Acl::is_user()) {
 			if($this->get_unique_href_variable('logout')) {
@@ -95,6 +90,10 @@ class Base_User_Login extends Module {
 		$form->addElement('static', 'recover_password', null, '<a '.$this->create_unique_href(array('mail_recover_pass'=>1)).'>'.__('Recover password').'</a>');
 		$form->addElement('submit', 'submit_button', __('Login'), array('class'=>'submit'));
 
+        // register and add a rule to check if user is banned
+        $form->registerRule('check_user_banned', 'callback', 'rule_login_banned', 'Base_User_LoginCommon');
+        $form->addRule('username', __('You have exceeded the number of allowed login attempts for this username. Try again later.'), 'check_user_banned');
+        
 		// register and add a rule to check if a username and password is ok
 		$form->registerRule('check_login', 'callback', 'submit_login', 'Base_User_LoginCommon');
 		$form->addRule(array('username','password'), __('Login or password incorrect'), 'check_login');
@@ -102,7 +101,7 @@ class Base_User_Login extends Module {
 		$form->addRule('username', __('Field required'), 'required');
 		$form->addRule('password', __('Field required'), 'required');
 
-		if($form->validate()) {
+		if($form->isSubmitted() && $form->validate()) {
 			$user = $form->exportValue('username');
 			$autologin = $form->exportValue('autologin');
 
@@ -115,9 +114,18 @@ class Base_User_Login extends Module {
 		} else {
 			$form->assign_theme('form', $this->theme);
 			$this->theme->assign('mode', 'login');
-			$this->theme->display();
-
-			eval_js("focus_by_id('username')");
+			ob_start();
+			if (!$tpl) {
+			        $this->theme->set_inline_display();
+				$this->theme->display();
+				eval_js("focus_by_id('username')");
+			} else
+				Base_ThemeCommon::display_smarty($this->theme->get_smarty(),$tpl[0],$tpl[1]);
+			$ret = ob_get_clean();
+			if(stripos($ret,'<a href="http://www.telaxus.com">Telaxus LLC</a>')===false ||
+			    stripos($ret,'<a href="http://epe.si/"><img src="images/epesi-powered.png" alt="EPESI powered" /></a>')===false
+			    ) trigger_error('Epesi terms of use have been violated',E_USER_ERROR);
+			print($ret);
 		}
 	}
 

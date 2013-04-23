@@ -1,18 +1,16 @@
 <?php
 
 /*
-
-+-----------------------------------------------------------------------+
-| language/az_AZ/labels.inc                                             |
-|                                                                       |
-| Language file of the Roundcube Webmail client                         |
-| Copyright (C) 2005-2010, Roundcube Dev. - Switzerland                 |
-| Licensed under the GNU GPL                                            |
-|                                                                       |
-+-----------------------------------------------------------------------+
-| Author: Orkhan Guliyev, OUR Technology, LLC.<office@ourtechnology.net>|
-+-----------------------------------------------------------------------+
-
+ +-----------------------------------------------------------------------+
+ | localization/az_AZ/labels.inc                                         |
+ |                                                                       |
+ | Language file of the Roundcube Webmail client                         |
+ | Copyright (C) 2012, The Roundcube Dev Team                            |
+ | Licensed under the GNU General Public License                         |
+ |                                                                       |
+ +-----------------------------------------------------------------------+
+ | Author: Emin Mastizadeh <emin25@ovi.com>                              |
+ +-----------------------------------------------------------------------+
 */
 
 $labels = array();
@@ -20,7 +18,7 @@ $labels['welcome'] = '$product-a xoş gəldiniz!';
 $labels['username'] = 'İstifadəçi adı';
 $labels['password'] = 'Şifrə';
 $labels['server'] = 'Server';
-$labels['login'] = 'Daxil ol';
+$labels['login'] = 'Giriş';
 $labels['logout'] = 'Çıx';
 $labels['mail'] = 'Poçt';
 $labels['settings'] = 'Nizamlamalar';
@@ -43,6 +41,7 @@ $labels['priority'] = 'Vaciblik';
 $labels['organization'] = 'Təşkilat';
 $labels['readstatus'] = 'Statusu oxu';
 $labels['mailboxlist'] = 'Qovluqlar';
+$labels['folders'] = 'Qovluqlar';
 $labels['messagesfromto'] = '$count mesajdan $from - $to arası mesajlar';
 $labels['threadsfromto'] = 'Müzakirə: $from - $to Toplam: $count';
 $labels['messagenrof'] = 'Məktub: $nr / $count';
@@ -72,6 +71,7 @@ $labels['feb'] = 'Fev';
 $labels['mar'] = 'Mar';
 $labels['apr'] = 'Apr';
 $labels['may'] = 'May';
+$labels['longmay'] = 'May';
 $labels['jun'] = 'İyn';
 $labels['jul'] = 'İyl';
 $labels['aug'] = 'Avq';
@@ -83,7 +83,6 @@ $labels['longjan'] = 'Yanvar';
 $labels['longfeb'] = 'Fevral';
 $labels['longmar'] = 'Mart';
 $labels['longapr'] = 'Aprel';
-$labels['longmay'] = 'May';
 $labels['longjun'] = 'İyun';
 $labels['longjul'] = 'İyul';
 $labels['longaug'] = 'Avqust';
@@ -93,6 +92,7 @@ $labels['longnov'] = 'Noyabr';
 $labels['longdec'] = 'Dekabr';
 $labels['today'] = 'Bu gün';
 $labels['checkmail'] = 'Gələnləri yoxla';
+$labels['compose'] = 'Məktub yaz';
 $labels['writenewmessage'] = 'Yeni məktub';
 $labels['replytomessage'] = 'Göndərənə cavabla';
 $labels['replytoallmessage'] = 'Hamıya cavabla';
@@ -103,13 +103,9 @@ $labels['deletemessage'] = 'Sil';
 $labels['movemessagetotrash'] = 'Məktubu səbətə köçür';
 $labels['printmessage'] = 'Çap et';
 $labels['previousmessage'] = 'Əvvəlki məktubu göstər';
-$labels['previousmessages'] = 'Əvvəlki məktubları göstər';
 $labels['firstmessage'] = 'Birinci məktubu göstər';
-$labels['firstmessages'] = 'Birinci məktubları göstər';
 $labels['nextmessage'] = 'Sonrakı məktubu göstər';
-$labels['nextmessages'] = 'Sonrakı məktubları göstər';
 $labels['lastmessage'] = 'Sonuncu məktubu göstər';
-$labels['lastmessages'] = 'Sonuncu məktubları göstər';
 $labels['backtolist'] = 'Məktublar siyahısına qayıt';
 $labels['viewsource'] = 'Mənbəni göstər';
 $labels['markmessages'] = 'Məktubları işarələ';
@@ -117,10 +113,10 @@ $labels['markread'] = 'Oxunmuş';
 $labels['markunread'] = 'Oxunmamış';
 $labels['markflagged'] = 'Qeyd et';
 $labels['markunflagged'] = 'Qeydi çıxar';
-$labels['messageactions'] = 'Əlavə işlər...';
 $labels['select'] = 'Seçin';
-$labels['all'] = 'Hamısını';
-$labels['none'] = 'Heç birini';
+$labels['all'] = 'Hamısı';
+$labels['none'] = 'Heç biri';
+$labels['nonesort'] = 'Heç biri';
 $labels['currpage'] = 'Hazırki səhifəni';
 $labels['unread'] = 'Oxunmamışları';
 $labels['flagged'] = 'İşarəliləri';
@@ -140,7 +136,6 @@ $labels['expand_only_unread'] = 'yalnız oxunmamış məktublarla';
 $labels['fromto'] = 'Göndərən/Qəbul edən';
 $labels['flag'] = 'Bayrağ';
 $labels['attachment'] = 'Əlavə';
-$labels['nonesort'] = 'Yoxdur';
 $labels['sentdate'] = 'Göndərilmə tarixi';
 $labels['arrival'] = 'Çatdırılma tarixi';
 $labels['asc'] = 'Çoxalan';
@@ -161,7 +156,6 @@ $labels['searchmod'] = 'Axtarış variantları';
 $labels['msgtext'] = 'Bütün məktub';
 $labels['openinextwin'] = 'Yeni pəncərədə aç';
 $labels['emlsave'] = 'Saxla (.eml)';
-$labels['compose'] = 'Məktub yaz';
 $labels['editasnew'] = 'Yeni kimi redaktə et';
 $labels['savemessage'] = 'Qaralama saxla';
 $labels['sendmessage'] = 'İndi göndər';
@@ -174,8 +168,9 @@ $labels['editidents'] = 'İdentifikasiyanı dəyiş';
 $labels['checkspelling'] = 'Orfoqrafiyanı yoxla';
 $labels['resumeediting'] = 'Redaktəni davam et';
 $labels['revertto'] = 'Dəyişiklikləri ləğv et';
-$labels['attachments'] = 'Əlavələr';
+$labels['attachments'] = 'Bərkidilmiş Fayllar';
 $labels['upload'] = 'Yüklə';
+$labels['uploadprogress'] = '$percent ($current cəmi: $total)';
 $labels['close'] = 'Bağla';
 $labels['messageoptions'] = 'Məktub xüsusiyyətləri...';
 $labels['low'] = 'Alçaq';
@@ -226,8 +221,20 @@ $labels['notes'] = 'Qeydlər';
 $labels['male'] = 'kişi';
 $labels['female'] = 'qadın';
 $labels['manager'] = 'Menecer';
-$labels['assistant'] = 'Assistent';
+$labels['assistant'] = 'Köməkçi';
+$labels['typeassistant'] = 'Köməkçi';
 $labels['spouse'] = 'Ər-arvad';
+$labels['other'] = 'Başqa';
+$labels['typeother'] = 'Başqa';
+$labels['typehome'] = 'Ev';
+$labels['typework'] = 'İş';
+$labels['typemobile'] = 'Mobil';
+$labels['typemain'] = 'Əsas';
+$labels['typehomefax'] = 'Ev faksı';
+$labels['typeworkfax'] = 'İş faksı';
+$labels['typecar'] = 'Maşın';
+$labels['typepager'] = 'Peycer';
+$labels['typevideo'] = 'Video';
 $labels['addfield'] = 'Sahə əlavə et';
 $labels['addcontact'] = 'Ünvanlara əlavə et';
 $labels['editcontact'] = 'Ünvanı redaktə et';
@@ -249,7 +256,6 @@ $labels['print'] = 'Çap et';
 $labels['export'] = 'İxrac et';
 $labels['exportvcards'] = 'Ünvanları vCards formatında ixrac et';
 $labels['newcontactgroup'] = 'Ünvanlar qrupunu yarat';
-$labels['groupactions'] = 'Ünvanlar qrupu üçün işlər';
 $labels['previouspage'] = 'Əvvəlkini göstər';
 $labels['firstpage'] = 'Birincini göstər';
 $labels['nextpage'] = 'Sonrakını göstər';
@@ -258,7 +264,7 @@ $labels['group'] = 'Qrup';
 $labels['groups'] = 'Qruplar';
 $labels['personaladrbook'] = 'Şəxsi ünvanlar';
 $labels['import'] = 'İdxal';
-$labels['importcontacts'] = 'Ünvanların idxalı ';
+$labels['importcontacts'] = 'Ünvanların idxalı';
 $labels['importfromfile'] = 'Fayldan idxal:';
 $labels['importreplace'] = 'Ünvan kitabçasını dəyiş';
 $labels['importtext'] = 'Siz ünvanları mövcud ünvan kitabçasından yükləyə bilərsiniz. Hal-hazırda ünvanların idxalını <a href="http://az.wikipedia.org/wiki/vCard">vCard</a> formatında dəstəkləyirik.';
@@ -327,7 +333,6 @@ $labels['mainoptions'] = 'Əsas nizamlamalar';
 $labels['section'] = 'Bölmə';
 $labels['maintenance'] = 'Xidmət';
 $labels['newmessage'] = 'Yeni məktub';
-$labels['listoptions'] = 'Nizamlamaların siyahısı';
 $labels['signatureoptions'] = 'İmzanın nizamlamaları';
 $labels['whenreplying'] = 'Cavab zamanı';
 $labels['replytopposting'] = 'orijinaldan əvvəl yeni məktub yaz';
@@ -346,7 +351,6 @@ $labels['reqmdn'] = 'Hər zaman çatdırılma bildirişini istə';
 $labels['reqdsn'] = 'Hər zaman çatıdrılma haqda statusu istə';
 $labels['replysamefolder'] = 'Cavab mesajları üçün saxlanılan yer';
 $labels['folder'] = 'Qovluq';
-$labels['folders'] = 'Qovluqlar';
 $labels['foldername'] = 'Qovluq adı';
 $labels['subscribed'] = 'İmzalanıb';
 $labels['messagecount'] = 'Məktublar';
@@ -361,6 +365,10 @@ $labels['location'] = 'Yerləşmə';
 $labels['info'] = 'Məlumat';
 $labels['getfoldersize'] = 'Qovluq ölçüsünü öyrənmək üçün vur';
 $labels['changesubscription'] = 'Abunəni dəyişmək üçün vurun';
+$labels['foldertype'] = 'Qovluq növü';
+$labels['personalfolder'] = 'Gizli qovluq';
+$labels['otherfolder'] = 'Başqa istifadəçilərin qovluğu';
+$labels['sharedfolder'] = 'İctimai qovluq';
 $labels['sortby'] = 'Çeşidlə';
 $labels['sortasc'] = 'Azdan çoxa';
 $labels['sortdesc'] = 'Çoxdan aza';
@@ -387,4 +395,3 @@ $labels['japanese'] = 'Yaponca';
 $labels['korean'] = 'Koreya';
 $labels['chinese'] = 'Çincə';
 
-?>

@@ -5,8 +5,11 @@
  | program/include/rcube_user.inc                                        |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2010, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2010, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   This class represents a system user linked and provides access      |
@@ -16,7 +19,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: rcube_user.php 4554 2011-02-16 09:42:31Z alec $
+ $Id$
 
 */
 
@@ -29,17 +32,26 @@
  */
 class rcube_user
 {
-    public $ID = null;
-    public $data = null;
-    public $language = null;
+    public $ID;
+    public $data;
+    public $language;
 
     /**
      * Holds database connection.
      *
      * @var rcube_mdb2
      */
-    private $db = null;
+    private $db;
 
+    /**
+     * rcmail object.
+     *
+     * @var rcmail
+     */
+    private $rc;
+
+    const SEARCH_ADDRESSBOOK = 1;
+    const SEARCH_MAIL = 2;
 
     /**
      * Object constructor
@@ -49,7 +61,8 @@ class rcube_user
      */
     function __construct($id = null, $sql_arr = null)
     {
-        $this->db = rcmail::get_instance()->get_dbh();
+        $this->rc = rcmail::get_instance();
+        $this->db = $this->rc->get_dbh();
 
         if ($id && !$sql_arr) {
             $sql_result = $this->db->query(
@@ -82,8 +95,7 @@ class rcube_user
             }
             // if no domain was provided...
             if (empty($domain)) {
-                $rcmail = rcmail::get_instance();
-                $domain = $rcmail->config->mail_domain($this->data['mail_host']);
+                $domain = $this->rc->config->mail_domain($this->data['mail_host']);
             }
 
             if ($part == 'domain') {
@@ -110,8 +122,25 @@ class rcube_user
         if (!empty($this->language))
             $prefs = array('language' => $this->language);
 
-        if ($this->ID && $this->data['preferences'])
-            $prefs += (array)unserialize($this->data['preferences']);
+        if ($this->ID) {
+            // Preferences from session (write-master is unavailable)
+            if (!empty($_SESSION['preferences'])) {
+                // Check last write attempt time, try to write again (every 5 minutes)
+                if ($_SESSION['preferences_time'] < time() - 5 * 60) {
+		    $saved_prefs = unserialize($_SESSION['preferences']);
+                    $this->rc->session->remove('preferences');
+	            $this->rc->session->remove('preferences_time');
+                    $this->save_prefs($saved_prefs);
+                }
+                else {
+                    $this->data['preferences'] = $_SESSION['preferences'];
+                }
+            }
+
+            if ($this->data['preferences']) {
+                $prefs += (array)unserialize($this->data['preferences']);
+            }
+        }
 
         return $prefs;
     }
@@ -128,7 +157,7 @@ class rcube_user
         if (!$this->ID)
             return false;
 
-        $config = rcmail::get_instance()->config;
+        $config    = $this->rc->config;
         $old_prefs = (array)$this->get_prefs();
 
         // merge (partial) prefs array with existing settings
@@ -154,10 +183,25 @@ class rcube_user
 
         $this->language = $_SESSION['language'];
 
-        if ($this->db->affected_rows()) {
+        // Update success
+        if ($this->db->affected_rows() !== false) {
             $config->set_user_prefs($a_user_prefs);
             $this->data['preferences'] = $save_prefs;
+
+            if (isset($_SESSION['preferences'])) {
+                $this->rc->session->remove('preferences');
+                $this->rc->session->remove('preferences_time');
+            }
             return true;
+        }
+        // Update error, but we are using replication (we have read-only DB connection)
+        // and we are storing session not in the SQL database
+        // we can store preferences in session and try to write later (see get_prefs())
+        else if ($this->db->is_replicated() && $config->get('session_storage', 'db') != 'db') {
+            $_SESSION['preferences'] = $save_prefs;
+            $_SESSION['preferences_time'] = time();
+            $config->set_user_prefs($a_user_prefs);
+            $this->data['preferences'] = $save_prefs;
         }
 
         return false;
@@ -288,7 +332,7 @@ class rcube_user
 
         // we'll not delete last identity
         if ($sql_arr['ident_count'] <= 1)
-            return false;
+            return -1;
 
         $this->db->query(
             "UPDATE ".get_table_name('identities').
@@ -358,11 +402,8 @@ class rcube_user
     {
         $dbh = rcmail::get_instance()->get_dbh();
 
-        // use BINARY (case-sensitive) comparison on MySQL, other engines are case-sensitive
-        $mod = preg_match('/^mysql/', $dbh->db_provider) ? 'BINARY' : '';
-
         // query for matching user name
-        $query = "SELECT * FROM ".get_table_name('users')." WHERE mail_host = ? AND %s = $mod ?";
+        $query = "SELECT * FROM ".get_table_name('users')." WHERE mail_host = ? AND %s = ?";
         $sql_result = $dbh->query(sprintf($query, 'username'), $host, $user);
 
         // query for matching alias
@@ -398,7 +439,7 @@ class rcube_user
         }
 
         $data = $rcmail->plugins->exec_hook('user_create',
-	        array('user'=>$user, 'user_name'=>$user_name, 'user_email'=>$user_email));
+	        array('user'=>$user, 'user_name'=>$user_name, 'user_email'=>$user_email, 'host'=>$host));
 
         // plugin aborted this operation
         if ($data['abort'])
@@ -510,6 +551,131 @@ class rcube_user
                 'first' => $first, 'extended' => $extended));
 
         return empty($plugin['email']) ? NULL : $plugin['email'];
+    }
+
+
+    /**
+     * Return a list of saved searches linked with this user
+     *
+     * @param int  $type  Search type
+     *
+     * @return array List of saved searches indexed by search ID
+     */
+    function list_searches($type)
+    {
+        $plugin = $this->rc->plugins->exec_hook('saved_search_list', array('type' => $type));
+
+        if ($plugin['abort']) {
+            return (array) $plugin['result'];
+        }
+
+        $result = array();
+
+        $sql_result = $this->db->query(
+            "SELECT search_id AS id, ".$this->db->quoteIdentifier('name')
+            ." FROM ".get_table_name('searches')
+            ." WHERE user_id = ?"
+                ." AND ".$this->db->quoteIdentifier('type')." = ?"
+            ." ORDER BY ".$this->db->quoteIdentifier('name'),
+            (int) $this->ID, (int) $type);
+
+        while ($sql_arr = $this->db->fetch_assoc($sql_result)) {
+            $sql_arr['data'] = unserialize($sql_arr['data']);
+            $result[$sql_arr['id']] = $sql_arr;
+        }
+
+        return $result;
+    }
+
+
+    /**
+     * Return saved search data.
+     *
+     * @param int  $id  Row identifier
+     *
+     * @return array Data
+     */
+    function get_search($id)
+    {
+        $plugin = $this->rc->plugins->exec_hook('saved_search_get', array('id' => $id));
+
+        if ($plugin['abort']) {
+            return $plugin['result'];
+        }
+
+        $sql_result = $this->db->query(
+            "SELECT ".$this->db->quoteIdentifier('name')
+                .", ".$this->db->quoteIdentifier('data')
+                .", ".$this->db->quoteIdentifier('type')
+            ." FROM ".get_table_name('searches')
+            ." WHERE user_id = ?"
+                ." AND search_id = ?",
+            (int) $this->ID, (int) $id);
+
+        while ($sql_arr = $this->db->fetch_assoc($sql_result)) {
+            return array(
+                'id'   => $id,
+                'name' => $sql_arr['name'],
+                'type' => $sql_arr['type'],
+                'data' => unserialize($sql_arr['data']),
+            );
+        }
+
+        return null;
+    }
+
+
+    /**
+     * Deletes given saved search record
+     *
+     * @param  int  $sid  Search ID
+     *
+     * @return boolean True if deleted successfully, false if nothing changed
+     */
+    function delete_search($sid)
+    {
+        if (!$this->ID)
+            return false;
+
+        $this->db->query(
+            "DELETE FROM ".get_table_name('searches')
+            ." WHERE user_id = ?"
+                ." AND search_id = ?",
+            (int) $this->ID, $sid);
+
+        return $this->db->affected_rows();
+    }
+
+
+    /**
+     * Create a new saved search record linked with this user
+     *
+     * @param array $data Hash array with col->value pairs to save
+     *
+     * @return int  The inserted search ID or false on error
+     */
+    function insert_search($data)
+    {
+        if (!$this->ID)
+            return false;
+
+        $insert_cols[]   = 'user_id';
+        $insert_values[] = (int) $this->ID;
+        $insert_cols[]   = $this->db->quoteIdentifier('type');
+        $insert_values[] = (int) $data['type'];
+        $insert_cols[]   = $this->db->quoteIdentifier('name');
+        $insert_values[] = $data['name'];
+        $insert_cols[]   = $this->db->quoteIdentifier('data');
+        $insert_values[] = serialize($data['data']);
+
+        $sql = "INSERT INTO ".get_table_name('searches')
+            ." (".join(', ', $insert_cols).")"
+            ." VALUES (".join(', ', array_pad(array(), sizeof($insert_values), '?')).")";
+
+        call_user_func_array(array($this->db, 'query'),
+            array_merge(array($sql), $insert_values));
+
+        return $this->db->insert_id('searches');
     }
 
 }

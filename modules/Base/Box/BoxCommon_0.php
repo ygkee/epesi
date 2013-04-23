@@ -14,8 +14,16 @@
 defined("_VALID_ACCESS") || die('Direct access forbidden');
 
 class Base_BoxCommon extends ModuleCommon {
+	public static $ini_file = null;
+	public static function get_ini_file() {
+		if (Base_BoxCommon::$ini_file)
+			$ini = Base_BoxCommon::$ini_file;
+		else
+			$ini = Base_ThemeCommon::get_template_file('Base_Box','default.ini');
+		return $ini;
+	}
 	public static function get_main_module_name() {
-		$ini = Base_ThemeCommon::get_template_file('Base_Box','default.ini');
+		$ini = self::get_ini_file();
 		if(!$ini) {
 			print(__('Unable to read Base_Box.ini file! Please create one, or change theme.'));
 			return;
@@ -72,7 +80,7 @@ class Base_BoxCommon extends ModuleCommon {
 		$version_no = __('version %s',array(EPESI_VERSION));
 		if (CHECK_VERSION && ModuleManager::is_installed('Base/EpesiStore')>=0) {
 			load_js('modules/Base/Box/check_for_new_version.js');
-			if ($force) eval_js('$("epesi_new_version").done = false;');
+			if ($force) eval_js('jq("#epesi_new_version").attr("done","0");');
 			eval_js('check_for_new_version();');
 			$version_no = '<span id="epesi_new_version">'.Utils_TooltipCommon::create($version_no, __('Checking if there are updates available...'), false).'</span>';
 			if (isset($_REQUEST['go_to_epesi_store_for_updates'])) {

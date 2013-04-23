@@ -11,7 +11,10 @@
 				{$form_data.permission.label}
 			</td>
 			<td class="epesi_data" style="width:80%;">
-				&nbsp;&nbsp;{$form_data.permission.html}
+				<div style="position: relative;">
+					{$form_data.permission.error}
+					&nbsp;&nbsp;{$form_data.permission.html}
+				</div>
 			</td>
 		</tr>
 		<tr>

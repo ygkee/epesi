@@ -4,22 +4,25 @@
  | steps/mail/search.inc                                                 |
  |                                                                       |
  | Search functions for rc webmail                                       |
- | Licensed under the GNU GPL                                            |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  +-----------------------------------------------------------------------+
  | Author: Benjamin Smith <defitro@gmail.com>                            |
  |         Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: search.inc 4321 2010-12-08 12:52:04Z alec $
+ $Id$
 
 */
 
 $REMOTE_REQUEST = TRUE;
 
 // reset list_page and old search results
-$IMAP->set_page(1);
-$IMAP->set_search_set(NULL);
+$RCMAIL->storage->set_page(1);
+$RCMAIL->storage->set_search_set(NULL);
 $_SESSION['page'] = 1;
 
 // using encodeURI with javascript "should" give us
@@ -27,10 +30,12 @@ $_SESSION['page'] = 1;
 $imap_charset = RCMAIL_CHARSET;
 
 // get search string
-$str = get_input_value('_q', RCUBE_INPUT_GET);
-$filter = get_input_value('_filter', RCUBE_INPUT_GET);
-$mbox = get_input_value('_mbox', RCUBE_INPUT_GET);
+$str     = get_input_value('_q', RCUBE_INPUT_GET, true);
+$mbox    = get_input_value('_mbox', RCUBE_INPUT_GET, true);
+$filter  = get_input_value('_filter', RCUBE_INPUT_GET);
 $headers = get_input_value('_headers', RCUBE_INPUT_GET);
+$subject = array();
+
 $search_request = md5($mbox.$filter.$str);
 
 // add list filter string
@@ -69,15 +74,20 @@ else if (preg_match("/^body:.*/i", $str))
   list(,$srch) = explode(":", $str);
   $subject['text'] = "TEXT";
 }
-else if(trim($str))
+else if (strlen(trim($str)))
 {
   if ($headers) {
-    foreach(explode(',', $headers) as $header)
-      switch ($header) {
-        case 'text': $subject['text'] = 'TEXT'; break;
-        default:     $subject[$header] = 'HEADER '.strtoupper($header);
+    foreach (explode(',', $headers) as $header) {
+      if ($header == 'text') {
+        // #1488208: get rid of other headers when searching by "TEXT"
+        $subject = array('text' => 'TEXT');
+        break;
       }
-    
+      else {
+        $subject[$header] = 'HEADER '.strtoupper($header);
+      }
+    }
+
     // save search modifiers for the current folder to user prefs
     $search_mods = $RCMAIL->config->get('search_mods', $SEARCH_MODS_DEFAULT);
     $search_mods[$mbox] = array_fill_keys(array_keys($subject), 1);
@@ -88,42 +98,44 @@ else if(trim($str))
   }
 }
 
-$search = $srch ? trim($srch) : trim($str);
+$search = isset($srch) ? trim($srch) : trim($str);
 
-if ($subject) {
+if (!empty($subject)) {
   $search_str .= str_repeat(' OR', count($subject)-1);
   foreach ($subject as $sub)
     $search_str .= sprintf(" %s {%d}\r\n%s", $sub, strlen($search), $search);
 }
 
-$search_str = trim($search_str);
+$search_str  = trim($search_str);
+$sort_column = rcmail_sort_column();
 
 // execute IMAP search
 if ($search_str)
-  $result = $IMAP->search($mbox, $search_str, $imap_charset, $_SESSION['sort_col']);
-
-// Get the headers
-$result_h = $IMAP->list_headers($mbox, 1, $_SESSION['sort_col'], $_SESSION['sort_order']);
-$count = $IMAP->messagecount(NULL, $IMAP->threading ? 'THREADS' : 'ALL');
+  $RCMAIL->storage->search($mbox, $search_str, $imap_charset, $sort_column);
 
 // save search results in session
 if (!is_array($_SESSION['search']))
   $_SESSION['search'] = array();
 
 if ($search_str) {
-  $_SESSION['search'] = $IMAP->get_search_set();
+  $_SESSION['search'] = $RCMAIL->storage->get_search_set();
   $_SESSION['last_text_search'] = $str;
 }
 $_SESSION['search_request'] = $search_request;
+
+
+// Get the headers
+$result_h = $RCMAIL->storage->list_messages($mbox, 1, $sort_column, rcmail_sort_order());
+$count = $RCMAIL->storage->count($mbox, $RCMAIL->storage->get_threading() ? 'THREADS' : 'ALL');
 
 // Make sure we got the headers
 if (!empty($result_h)) {
   rcmail_js_message_list($result_h);
   if ($search_str)
-    $OUTPUT->show_message('searchsuccessful', 'confirmation', array('nr' => $IMAP->messagecount(NULL, 'ALL')));
+    $OUTPUT->show_message('searchsuccessful', 'confirmation', array('nr' => $RCMAIL->storage->count(NULL, 'ALL')));
 }
 // handle IMAP errors (e.g. #1486905)
-else  if ($err_code = $IMAP->get_error_code()) {
+else  if ($err_code = $RCMAIL->storage->get_error_code()) {
   rcmail_display_server_error();
 }
 else {
@@ -133,8 +145,6 @@ else {
 // update message count display
 $OUTPUT->set_env('search_request', $search_str ? $search_request : '');
 $OUTPUT->set_env('messagecount', $count);
-$OUTPUT->set_env('pagecount', ceil($count/$IMAP->page_size));
-$OUTPUT->command('set_rowcount', rcmail_get_messagecount_text($count, 1));
+$OUTPUT->set_env('pagecount', ceil($count/$RCMAIL->storage->get_pagesize()));
+$OUTPUT->command('set_rowcount', rcmail_get_messagecount_text($count, 1), $mbox);
 $OUTPUT->send();
-
-

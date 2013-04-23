@@ -5,8 +5,11 @@
  | program/steps/utils/error.inc                                         |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2010, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2012, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Display error message page                                          |
@@ -15,22 +18,22 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: error.inc 4509 2011-02-09 10:51:50Z thomasb $
+ $Id$
 
 */
 
 
 // browser is not compatible with this application
 if ($ERROR_CODE==409) {
-  $user_agent = $GLOBALS['HTTP_SERVER_VARS']['HTTP_USER_AGENT'];
+  $user_agent = htmlentities($_SERVER['HTTP_USER_AGENT']);
   $__error_title = 'Your browser does not suit the requirements for this application';
   $__error_text = <<<EOF
 <i>Supported browsers:</i><br />
-&raquo; &nbsp;Netscape 7+<br />
-&raquo; &nbsp;Microsoft Internet Explorer 6+<br />
-&raquo; &nbsp;Mozilla Firefox 1.0+<br />
-&raquo; &nbsp;Opera 8.0+<br />
-&raquo; &nbsp;Safari 1.2+<br />
+&raquo; &nbsp;Microsoft Internet Explorer 7+<br />
+&raquo; &nbsp;Mozilla Firefox 3+<br />
+&raquo; &nbsp;Chrome 10+<br />
+&raquo; &nbsp;Safari 4+<br />
+&raquo; &nbsp;Opera 8+<br />
 <br />
 &raquo; &nbsp;JavaScript enabled<br />
 &raquo; &nbsp;Support for XMLHTTPRequest<br />
@@ -91,10 +94,11 @@ else {
     $__error_text = sprintf('Error No. [%s]', $ERROR_CODE);
 }
 
+$HTTP_ERR_CODE = $ERROR_CODE && $ERROR_CODE < 600 ? $ERROR_CODE : 500;
 
 // Ajax request
 if ($OUTPUT && ($OUTPUT instanceof rcube_json_output)) {
-  header("HTTP/1.0 $ERROR_CODE $__error_title");
+  header("HTTP/1.0 $HTTP_ERR_CODE $__error_title");
   die;
 }
 
@@ -112,12 +116,13 @@ if ($OUTPUT && $OUTPUT->template_exists('error')) {
 }
 
 $__skin = $CONFIG->skin ? $CONFIG->skin : 'default';
+$__productname = $CONFIG['product_name'] ? $CONFIG['product_name'] : 'Roundcube Webmail';
 
 // print system error page
 print <<<EOF
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml"><head>
-<title>Roundcube|Mail : ERROR $ERROR_CODE</title>
+<title>$__productname :: ERROR</title>
 <link rel="stylesheet" type="text/css" href="skins/$__skin/common.css" />
 </head>
 <body>

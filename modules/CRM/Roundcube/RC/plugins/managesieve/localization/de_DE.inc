@@ -1,9 +1,23 @@
 <?php
 
+/*
+ +-----------------------------------------------------------------------+
+ | localization/de_DE/labels.inc                                         |
+ |                                                                       |
+ | Language file of the Roundcube Webmail client                         |
+ | Copyright (C) 2012, The Roundcube Dev Team                            |
+ | Licensed under the GNU General Public License                         |
+ |                                                                       |
+ +-----------------------------------------------------------------------+
+ | Author: Sebastian Schweizer                                           |
+ +-----------------------------------------------------------------------+
+*/
+
+$labels = array();
 $labels['filters'] = 'Filter';
-$labels['managefilters'] = 'Posteingangs-Filter verwalten';
+$labels['managefilters'] = 'Filter für eingehende Nachrichten verwalten';
 $labels['filtername'] = 'Filtername';
-$labels['newfilter'] = 'Filter anlegen';
+$labels['newfilter'] = 'Neuer Filter';
 $labels['filteradd'] = 'Filter hinzufügen';
 $labels['filterdel'] = 'Filter löschen';
 $labels['moveup'] = 'Nach oben';
@@ -17,19 +31,23 @@ $labels['filteris'] = 'ist gleich';
 $labels['filterisnot'] = 'ist ungleich';
 $labels['filterexists'] = 'existiert';
 $labels['filternotexists'] = 'existiert nicht';
+$labels['filtermatches'] = 'trifft auf Ausdruck zu';
+$labels['filternotmatches'] = 'trifft nicht auf Ausdruck zu';
+$labels['filterregex'] = 'trifft auf regulären Ausdruck zu';
+$labels['filternotregex'] = 'trifft nicht auf regulären Ausdruck zu';
 $labels['filterunder'] = 'unter';
 $labels['filterover'] = 'über';
 $labels['addrule'] = 'Regel hinzufügen';
 $labels['delrule'] = 'Regel löschen';
-$labels['messagemoveto'] = 'Verschiebe Nachricht nach';
-$labels['messageredirect'] = 'Leite Nachricht um an';
-$labels['messagecopyto'] = 'Kopiere Nachricht nach';
-$labels['messagesendcopy'] = 'Sende Kopie an';
-$labels['messagereply'] = 'Antworte mit Nachricht';
-$labels['messagedelete'] = 'Lösche Nachricht';
-$labels['messagediscard'] = 'Weise ab mit Nachricht';
+$labels['messagemoveto'] = 'Nachricht verschieben nach';
+$labels['messageredirect'] = 'Nachricht umleiten an';
+$labels['messagecopyto'] = 'Nachricht kopieren nach';
+$labels['messagesendcopy'] = 'Kopie senden an';
+$labels['messagereply'] = 'Mit Nachricht antworten';
+$labels['messagedelete'] = 'Nachricht löschen';
+$labels['messagediscard'] = 'Abweisen mit Nachricht';
 $labels['messagesrules'] = 'Für eingehende Nachrichten:';
-$labels['messagesactions'] = '...führende folgende Aktionen aus:';
+$labels['messagesactions'] = '...führe folgende Aktionen aus:';
 $labels['add'] = 'Hinzufügen';
 $labels['del'] = 'Löschen';
 $labels['sender'] = 'Absender';
@@ -37,13 +55,15 @@ $labels['recipient'] = 'Empfänger';
 $labels['vacationaddresses'] = 'Zusätzliche Liste von E-Mail Empfängern (Komma getrennt):';
 $labels['vacationdays'] = 'Wie oft sollen Nachrichten gesendet werden (in Tagen):';
 $labels['vacationreason'] = 'Nachrichteninhalt (Abwesenheitsgrund):';
+$labels['vacationsubject'] = 'Nachrichtenbetreff';
 $labels['rulestop'] = 'Regelauswertung anhalten';
+$labels['enable'] = 'Aktivieren/Deaktivieren';
 $labels['filterset'] = 'Filtersätze';
+$labels['filtersets'] = 'Filtersätze';
 $labels['filtersetadd'] = 'Filtersatz anlegen';
 $labels['filtersetdel'] = 'Aktuellen Filtersatz löschen';
 $labels['filtersetact'] = 'Aktuellen Filtersatz aktivieren';
 $labels['filtersetdeact'] = 'Aktuellen Filtersatz deaktivieren';
-$labels['filtersetget'] = 'Filtersatz im Textformat herunterladen';
 $labels['filterdef'] = 'Filterdefinition';
 $labels['filtersetname'] = 'Filtersatzname';
 $labels['newfilterset'] = 'Neuer Filtersatz';
@@ -64,29 +84,65 @@ $labels['valueislessthan'] = 'Wert ist kleiner';
 $labels['valueislessthanequal'] = 'Wert ist gleich oder kleiner als';
 $labels['valueequals'] = 'Wert ist gleich';
 $labels['valuenotequals'] = 'Wert ist ungleich';
+$labels['setflags'] = 'Markierung an der Nachricht setzen';
+$labels['addflags'] = 'Markierung zur Nachricht hinzufügen';
+$labels['removeflags'] = 'Markierungen von der Nachricht entfernen';
+$labels['flagread'] = 'Gelesen';
+$labels['flagdeleted'] = 'Gelöscht';
+$labels['flaganswered'] = 'Beantwortet';
+$labels['flagflagged'] = 'Markiert';
+$labels['flagdraft'] = 'Entwurf';
+$labels['filtercreate'] = 'Filter erstellen';
+$labels['usedata'] = 'Die folgenden Daten im Filter benutzen:';
+$labels['nextstep'] = 'Nächster Schritt';
+$labels['...'] = '...';
+$labels['advancedopts'] = 'Erweiterte Optionen';
+$labels['body'] = 'Textkörper';
+$labels['address'] = 'Adresse';
+$labels['envelope'] = 'Umschlag';
+$labels['modifier'] = 'Modifikator:';
+$labels['text'] = 'Text';
+$labels['undecoded'] = 'Nicht dekodiert';
+$labels['contenttype'] = 'Inhaltstyp';
+$labels['modtype'] = 'Typ:';
+$labels['allparts'] = 'Alle';
+$labels['domain'] = 'Domäne';
+$labels['localpart'] = 'lokaler Teil';
+$labels['user'] = 'Benutzer';
+$labels['detail'] = 'Detail';
+$labels['comparator'] = 'Komperator:';
+$labels['default'] = 'Vorgabewert';
+$labels['octet'] = 'strikt (Oktett)';
+$labels['asciicasemap'] = 'Groß-/Kleinschreibung ignorieren';
+$labels['asciinumeric'] = 'numerisch (ascii-numeric)';
+$labels['filterunknownerror'] = 'Unbekannter Serverfehler';
+$labels['filterconnerror'] = 'Kann keine Verbindung mit Managesieve-Server herstellen';
+$labels['filterdeleteerror'] = 'Fehler beim Löschen des Filters. Serverfehler';
+$labels['filterdeleted'] = 'Filter erfolgreich gelöscht';
+$labels['filtersaved'] = 'Filter erfolgreich gespeichert';
+$labels['filtersaveerror'] = 'Fehler beim Speichern des Filters. Serverfehler';
+$labels['filterdeleteconfirm'] = 'Möchten Sie den ausgewählten Filter wirklich löschen?';
+$labels['ruledeleteconfirm'] = 'Sind Sie sicher, dass Sie die ausgewählte Regel löschen möchten?';
+$labels['actiondeleteconfirm'] = 'Sind Sie sicher, dass Sie die ausgewählte Aktion löschen möchten?';
+$labels['forbiddenchars'] = 'Unzulässige Zeichen im Eingabefeld';
+$labels['cannotbeempty'] = 'Eingabefeld darf nicht leer sein';
+$labels['ruleexist'] = 'Ein Filter mit dem angegebenen Namen existiert bereits.';
+$labels['setactivateerror'] = 'Kann ausgewählten Filtersatz nicht aktivieren. Serverfehler';
+$labels['setdeactivateerror'] = 'Kann ausgewählten Filtersatz nicht deaktivieren. Serverfehler';
+$labels['setdeleteerror'] = 'Kann ausgewählten Filtersatz nicht löschen. Serverfehler';
+$labels['setactivated'] = 'Filtersatz wurde erfolgreich aktiviert';
+$labels['setdeactivated'] = 'Filtersatz wurde erfolgreich deaktiviert';
+$labels['setdeleted'] = 'Filtersatz wurde erfolgreich gelöscht';
+$labels['setdeleteconfirm'] = 'Sind Sie sicher, dass Sie den ausgewählten Filtersatz löschen möchten?';
+$labels['setcreated'] = 'Filtersatz wurde erfolgreich erstellt';
+$labels['activateerror'] = 'Filter kann nicht aktiviert werden. Serverfehler.';
+$labels['deactivateerror'] = 'Filter kann nicht deaktiviert werden. Serverfehler.';
+$labels['activated'] = 'Filter erfolgreich aktiviert.';
+$labels['deactivated'] = 'Filter erfolgreich deaktiviert.';
+$labels['moved'] = 'Filter erfolgreich verschoben.';
+$labels['moveerror'] = 'Filter kann nicht verschoben werden. Serverfehler.';
+$labels['nametoolong'] = 'Kann Filtersatz nicht erstellen. Name zu lang';
+$labels['namereserved'] = 'Reservierter Name.';
+$labels['setexist'] = 'Filtersatz existiert bereits.';
+$labels['nodata'] = 'Mindestens eine Position muss ausgewählt werden!';
 
-$messages = array();
-$messages['filterunknownerror'] = 'Unbekannter Serverfehler';
-$messages['filterconnerror'] = 'Kann keine Verbindung mit Managesieve-Server herstellen';
-$messages['filterdeleteerror'] = 'Fehler beim Löschen des Filters. Serverfehler';
-$messages['filterdeleted'] = 'Filter erfolgreich gelöscht';
-$messages['filtersaved'] = 'Filter erfolgreich gespeichert';
-$messages['filtersaveerror'] = 'Fehler beim Speichern des Filters. Serverfehler';
-$messages['filterdeleteconfirm'] = 'Möchten Sie den ausgewählten Filter wirklich löschen?';
-$messages['ruledeleteconfirm'] = 'Sind Sie sicher, dass Sie die ausgewählte Regel löschen möchten?';
-$messages['actiondeleteconfirm'] = 'Sind Sie sicher, dass Sie die ausgewählte Aktion löschen möchten?';
-$messages['forbiddenchars'] = 'Unzulässige Zeichen im Eingabefeld';
-$messages['cannotbeempty'] = 'Eingabefeld darf nicht leer sein';
-$messages['setactivateerror'] = 'Kann ausgewählten Filtersatz nicht aktivieren. Serverfehler';
-$messages['setdeactivateerror'] = 'Kann ausgewählten Filtersatz nicht deaktivieren. Serverfehler';
-$messages['setdeleteerror'] = 'Kann ausgewählten Filtersatz nicht löschen. Serverfehler';
-$messages['setactivated'] = 'Filtersatz wurde erfolgreich aktiviert';
-$messages['setdeactivated'] = 'Filtersatz wurde erfolgreich deaktiviert';
-$messages['setdeleted'] = 'Filtersatz wurde erfolgreich gelöscht';
-$messages['setdeleteconfirm'] = 'Sind Sie sicher, dass Sie den ausgewählten Filtersatz löschen möchten?';
-$messages['setcreateerror'] = 'Kann Filtersatz nicht erstellen. Serverfehler';
-$messages['setcreated'] = 'Filtersatz wurde erfolgreich erstellt';
-$messages['emptyname'] = 'Kann Filtersatz nicht erstellen. Kein Name vergeben';
-$messages['nametoolong'] = 'Kann Filtersatz nicht erstellen. Name zu lang'
-
-?>

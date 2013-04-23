@@ -5,44 +5,53 @@
  *
  * Driver to change passwords via DirectAdmin Control Panel
  *
- * @version 1.0
+ * @version 2.1
  * @author Victor Benincasa <vbenincasa@gmail.com>
  *
  */
 
+class rcube_directadmin_password
+{
+    public function save($curpass, $passwd)
+    {
+        $rcmail = rcmail::get_instance();
+        $Socket = new HTTPSocket;
 
-function password_save($curpass, $passwd){
+        $da_user    = $_SESSION['username'];
+        $da_curpass = $curpass;
+        $da_newpass = $passwd;
+        $da_host    = $rcmail->config->get('password_directadmin_host');
+        $da_port    = $rcmail->config->get('password_directadmin_port');
 
-    $rcmail = rcmail::get_instance();
-    $Socket = new HTTPSocket;
+        if (strpos($da_user, '@') === false) {
+            return array('code' => PASSWORD_ERROR, 'message' => 'Change the SYSTEM user password through control panel!');
+        }
 
-    $da_user    = $_SESSION['username'];
-    $da_curpass = $curpass;
-    $da_newpass = $passwd;
-    $da_host    = $rcmail->config->get('password_directadmin_host');
-    $da_port    = $rcmail->config->get('password_directadmin_port');
+        $da_host = str_replace('%h', $_SESSION['imap_host'], $da_host);
+        $da_host = str_replace('%d', $rcmail->user->get_username('domain'), $da_host);
 
-    $Socket->connect($da_host,$da_port); 
-    $Socket->set_method('POST');
-    $Socket->query('/CMD_CHANGE_EMAIL_PASSWORD',
-        array(
-            'email' 		=> $da_user,
-            'oldpassword' 	=> $da_curpass,
-            'password1' 	=> $da_newpass,
-            'password2' 	=> $da_newpass,
-            'api' 			=> '1'
-    ));
-    $response = $Socket->fetch_parsed_body();
+        $Socket->connect($da_host,$da_port); 
+        $Socket->set_method('POST');
+        $Socket->query('/CMD_CHANGE_EMAIL_PASSWORD',
+            array(
+                'email' 		=> $da_user,
+                'oldpassword' 	=> $da_curpass,
+                'password1' 	=> $da_newpass,
+                'password2' 	=> $da_newpass,
+                'api' 			=> '1'
+            ));
+        $response = $Socket->fetch_parsed_body();
 
-	//console("DA error response: $response[text] [$da_user]");
+        //DEBUG
+        //console("Password Plugin: [USER: $da_user] [HOST: $da_host] - Response: [SOCKET: ".$Socket->result_status_code."] [DA ERROR: ".strip_tags($response['error'])."] [TEXT: ".$response[text]."]");
 
-    if($Socket->result_status_code <> 200)
-        return PASSWORD_CONNECT_ERROR;
-    elseif($response['error'] == 1){ //Error description: $response[text] 
-        return PASSWORD_ERROR;
-    }else 
-        return PASSWORD_SUCCESS;
-
+        if($Socket->result_status_code != 200)
+            return array('code' => PASSWORD_CONNECT_ERROR, 'message' => $Socket->error[0]);
+        elseif($response['error'] == 1)
+            return array('code' => PASSWORD_ERROR, 'message' => strip_tags($response['text']));
+        else
+            return PASSWORD_SUCCESS;
+    }
 }
 
 
@@ -53,15 +62,16 @@ function password_save($curpass, $passwd){
  *
  * Very, very basic usage:
  *   $Socket = new HTTPSocket;
- *   echo $Socket->get('http://user:pass@somesite.com/somedir/some.file?query=string&this=that');
+ *   echo $Socket->get('http://user:pass@somehost.com:2222/CMD_API_SOMEAPI?query=string&this=that');
  *
  * @author Phi1 'l0rdphi1' Stier <l0rdphi1@liquenox.net>
+ * @updates 2.7 and 2.8 by Victor Benincasa <vbenincasa @ gmail.com>
  * @package HTTPSocket
- * @version 2.6
+ * @version 2.8
  */
 class HTTPSocket {
 
-    var $version = '2.6';
+    var $version = '2.8';
     
     /* all vars are private except $error, $query_cache, and $doFollowLocationHeader */
 
@@ -98,7 +108,7 @@ class HTTPSocket {
     {
         if (!is_numeric($port))
         {
-            $port = 80;
+            $port = 2222;
         }
 
         $this->remote_host = $host;
@@ -157,8 +167,8 @@ class HTTPSocket {
         $this->error = $this->warn = array();
         $this->result_status_code = NULL;
 
-        // is our request a http:// ... ?
-        if (preg_match('!^http://!i',$request))
+        // is our request a http(s):// ... ?
+        if (preg_match('/^(http|https):\/\//i',$request))
         {
             $location = parse_url($request);
             $this->connect($location['host'],$location['port']);
@@ -176,7 +186,7 @@ class HTTPSocket {
 
         $array_headers = array(
             'User-Agent' => "HTTPSocket/$this->version",
-            'Host' => ( $this->remote_port == 80 ? $this->remote_host : "$this->remote_host:$this->remote_port" ),
+            'Host' => ( $this->remote_port == 80 ? parse_url($this->remote_host,PHP_URL_HOST) : parse_url($this->remote_host,PHP_URL_HOST).":".$this->remote_port ),
             'Accept' => '*/*',
             'Connection' => 'Close' );
 
@@ -316,8 +326,8 @@ class HTTPSocket {
             }
 
         }
-
-        list($this->result_header, $this->result_body) = explode("\r\n\r\n", $this->result, 2);
+        
+        list($this->result_header,$this->result_body) = preg_split("/\r\n\r\n/",$this->result,2);
 
         if ($this->bind_host)
         {
@@ -378,7 +388,7 @@ class HTTPSocket {
         {
             if ($asArray)
             {
-                return explode("\n", $this->fetch_body());
+                return preg_split("/\n/",$this->fetch_body());
             }
 
             return $this->fetch_body();
@@ -438,14 +448,14 @@ class HTTPSocket {
      */
     function fetch_header( $header = '' )
     {
-        $array_headers = explode("\r\n", $this->result_header);
-
+        $array_headers = preg_split("/\r\n/",$this->result_header);
+        
         $array_return = array( 0 => $array_headers[0] );
         unset($array_headers[0]);
 
         foreach ( $array_headers as $pair )
         {
-            list($key,$value) = explode(": ", $pair, 2);
+            list($key,$value) = preg_split("/: /",$pair,2);
             $array_return[strtolower($key)] = $value;
         }
 
@@ -479,5 +489,3 @@ class HTTPSocket {
     }
 
 }
-
-?>

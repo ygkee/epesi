@@ -46,7 +46,7 @@ if($cur_ver!==EPESI_VERSION) {
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-      <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
+      <meta content="text/html; charset=utf-8" http-equiv="content-type">
       <title>EPESI update</title>
       <link href="setup.css" type="text/css" rel="stylesheet"/>
 </head>
@@ -70,7 +70,7 @@ if($cur_ver!==EPESI_VERSION) {
         </center>
         <br>
         <center>
-        <span class="footer">Copyright &copy; 2008 &bull; <a href="http://www.telaxus.com">Telaxus LLC</a></span>
+        <span class="footer">Copyright &copy; 2013 &bull; <a href="http://www.telaxus.com">Telaxus LLC</a></span>
         <br>
         <p><a href="http://www.epesi.org"><img src="images/epesi-powered.png" alt="image" border="0"></a></p>
         </center>
@@ -141,13 +141,13 @@ Please choose EPESI version:<ul>
 <?php
 	ini_set('include_path','libs/minify'.PATH_SEPARATOR.'.'.PATH_SEPARATOR.'libs'.PATH_SEPARATOR.ini_get('include_path'));
 	require_once('Minify/Build.php');
-	$jses = array('libs/prototype.js','libs/jquery-1.7.2.min.js','libs/jquery-ui-1.8.21.custom.min.js','libs/HistoryKeeper.js','include/epesi.js');
+	$jses = array('libs/prototype.js','libs/jquery-1.7.2.min.js','libs/jquery-ui-1.10.1.custom.min.js','libs/HistoryKeeper.js','include/epesi.js');
 	$jsses_build = new Minify_Build($jses);
 	$jsses_src = $jsses_build->uri('serve.php?'.http_build_query(array('f'=>array_values($jses))));
 ?>
 		<script type="text/javascript" src="<?php print($jsses_src)?>"></script>
 <?php
-	$csses = array('libs/jquery-ui-1.8.21.custom.css');
+	$csses = array('libs/jquery-ui-1.10.1.custom.min.css');
 	$csses_build = new Minify_Build($csses);
 	$csses_src = $csses_build->uri('serve.php?'.http_build_query(array('f'=>array_values($csses))));
 ?>
@@ -219,7 +219,22 @@ Please choose EPESI version:<ul>
 				</table>
 			</div>	
 		</div>
+        <?php 
+        /*
+         * init_js file allows only num_of_clients sessions. If there is image
+         * with empty src="" browser will load index.php file, so we cannot
+         * include init_js file directly because num_of_clients request will
+         * reset our history and restart EPESI.
+         * 
+         * Check here if request accepts html. If it does we can assume that
+         * this is request for page and include init_js file which is faster.
+         * If there is not 'html' in accept use script with src property.
+         */
+        if(isset($_SERVER['HTTP_ACCEPT']) && stripos($_SERVER['HTTP_ACCEPT'], 'html') !== false) { ?>
+		<script type="text/javascript"><?php require_once 'init_js.php'; ?></script>
+        <?php } else { ?>
 		<script type="text/javascript" src="init_js.php?<?php print(http_build_query($_GET));?>"></script>
+        <?php } ?>
         <noscript>Please enable JavaScript in your browser and let EPESI work!</noscript>
 		<?php if(IPHONE) { ?>
 		<script type="text/javascript">var iphone=true;</script>

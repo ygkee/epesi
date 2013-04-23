@@ -14,24 +14,22 @@ class CRM_RoundcubeInstall extends ModuleInstall {
 
     public function install() {
         $this->create_data_dir();
+        // create htaccess to prevent logs to be available on the internet
+        $htaccess = $this->get_data_dir() . '.htaccess';
+        $f = fopen($htaccess, 'w');
+        if ($f === false) {
+            print("Cannot create .htaccess file ($htaccess). "
+                    . "Your Roundcube logs may be available on the internet!");
+        } else {
+            fwrite($f, "deny from all\n");
+            fclose($f);
+        }
+        
         Base_ThemeCommon::install_default_theme($this -> get_type());
 
-		@DB::DropSequence('rc_user_ids');
-        @DB::DropTable('rc_users');
-		@DB::DropSequence('rc_identity_ids');
-        @DB::DropTable('rc_identities');
-		@DB::DropSequence('rc_contact_ids');
-        @DB::DropTable('rc_contacts');
-		@DB::DropSequence('rc_contactgroups_ids');
-        @DB::DropTable('rc_contactgroups');
-        @DB::DropTable('rc_contactgroupmembers');
-        @DB::DropTable('rc_session');
-		@DB::DropSequence('rc_cache_ids');
-        @DB::DropTable('rc_cache');
-		@DB::DropSequence('rc_message_ids');
-        @DB::DropTable('rc_messages');
+        $this->drop_all_rc_tables();
 
-        if(DATABASE_DRIVER=='mysqlt')
+        if(DATABASE_DRIVER=='mysqlt' || DATABASE_DRIVER=='mysqli')
             $f = file_get_contents('modules/CRM/Roundcube/RC/SQL/mysql.initial.sql');
         else
             $f = file_get_contents('modules/CRM/Roundcube/RC/SQL/postgres.initial.sql');
@@ -44,7 +42,7 @@ class CRM_RoundcubeInstall extends ModuleInstall {
         Utils_CommonDataCommon::new_array('CRM/Roundcube/Security', array('tls'=>_M('TLS'),'ssl'=>_M('SSL')),true,true);
 
         $fields = array(
-            array('name' => _M('Epesi User'),             'type'=>'integer', 'extra'=>false, 'visible'=>true, 'required'=>true, 'display_callback'=>array('CRM_RoundcubeCommon', 'display_epesi_user'), 'QFfield_callback'=>array('CRM_RoundcubeCommon', 'QFfield_epesi_user')),
+            array('name' => _M('EPESI User'),             'type'=>'integer', 'extra'=>false, 'visible'=>true, 'required'=>true, 'display_callback'=>array('CRM_RoundcubeCommon', 'display_epesi_user'), 'QFfield_callback'=>array('CRM_RoundcubeCommon', 'QFfield_epesi_user')),
             array('name' => _M('Email'),             'type'=>'text', 'extra'=>false, 'visible'=>true, 'required'=>true, 'param'=>128),
         	array('name' => _M('Account Name'),             'type'=>'text', 'extra'=>false, 'visible'=>true, 'required'=>true, 'param'=>32,'QFfield_callback'=>array('CRM_RoundcubeCommon','QFfield_account_name')),
         	array('name' => _M('Server'),             'type'=>'text', 'extra'=>false, 'visible'=>true, 'param'=>'255', 'required'=>true),
@@ -141,6 +139,24 @@ class CRM_RoundcubeInstall extends ModuleInstall {
                 'extra'=>false,
                 'visible'=>false,
                 'required'=>false
+            ),
+            array(
+                'name' => _M('Message ID'),
+                'type'=>'text',
+                'param'=>128,
+                'extra'=>false,
+                'visible'=>false,
+                'required'=>false,
+                'QFfield_callback'=>array('CRM_RoundcubeCommon','QFfield_hidden')
+            ),
+            array(
+                'name' => _M('References'),
+                'type'=>'text',
+                'param'=>128,
+                'extra'=>false,
+                'visible'=>false,
+                'required'=>false,
+                'QFfield_callback'=>array('CRM_RoundcubeCommon','QFfield_hidden')
             )
         );
         Utils_RecordBrowserCommon::install_new_recordset('rc_mails', $fields);
@@ -223,20 +239,7 @@ class CRM_RoundcubeInstall extends ModuleInstall {
     }
 
     public function uninstall() {
-		@DB::DropSequence('rc_user_ids');
-        @DB::DropTable('rc_users');
-		@DB::DropSequence('rc_identity_ids');
-        @DB::DropTable('rc_identities');
-		@DB::DropSequence('rc_contact_ids');
-        @DB::DropTable('rc_contacts');
-		@DB::DropSequence('rc_contactgroups_ids');
-        @DB::DropTable('rc_contactgroups');
-        @DB::DropTable('rc_contactgroupmembers');
-        @DB::DropTable('rc_session');
-		@DB::DropSequence('rc_cache_ids');
-        @DB::DropTable('rc_cache');
-		@DB::DropSequence('rc_message_ids');
-        @DB::DropTable('rc_messages');
+        $this->drop_all_rc_tables();
 
         Utils_RecordBrowserCommon::delete_addon('rc_mails', 'CRM/Roundcube', 'attachments_addon');
         Utils_RecordBrowserCommon::delete_addon('contact', 'CRM/Roundcube', 'addon');
@@ -255,6 +258,27 @@ class CRM_RoundcubeInstall extends ModuleInstall {
         Variable::delete('crm_roundcube_global_signature');
 
         return true;
+    }
+    
+    private function drop_all_rc_tables() {
+        @DB::DropSequence('rc_search_ids');
+        @DB::DropTable('rc_searches');
+        @DB::DropTable('rc_dictionary');
+        @DB::DropSequence('rc_cache_ids');
+        @DB::DropTable('rc_cache');
+        @DB::DropTable('rc_cache_index');
+        @DB::DropTable('rc_cache_messages');
+        @DB::DropTable('rc_cache_thread');
+        @DB::DropSequence('rc_identity_ids');
+        @DB::DropTable('rc_identities');
+        @DB::DropTable('rc_contactgroupmembers');
+        @DB::DropSequence('rc_contactgroups_ids');
+        @DB::DropTable('rc_contactgroups');
+        @DB::DropSequence('rc_contact_ids');
+        @DB::DropTable('rc_contacts');
+        @DB::DropTable('rc_session');
+        @DB::DropSequence('rc_user_ids');
+        @DB::DropTable('rc_users');
     }
 
     public function version() {

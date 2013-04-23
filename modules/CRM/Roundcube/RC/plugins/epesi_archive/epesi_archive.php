@@ -149,12 +149,13 @@ class epesi_archive extends rcube_plugin
     global $E_SESSION;
     $rcmail = rcmail::get_instance();
     $path = getcwd();
-    chdir(str_replace('/modules/CRM/Roundcube/RC','',$path));
+    chdir(str_replace(array('/modules/CRM/Roundcube/RC','\\modules\\CRM\\Roundcube\\RC'),'',$path));
 
-    $msgs = array();    
+    $msgs = array();
+    if (!is_array($uids)) $uids = $uids->get();
     foreach($uids as $uid) {
         $msg = new rcube_message($uid);
-        if (empty($msg->headers)) {
+        if ($msg===null || empty($msg->headers)) {
             if($verbose) {
                 $rcmail->output->command('display_message','messageopenerror', 'error');
             }
@@ -166,14 +167,14 @@ class epesi_archive extends rcube_plugin
 
     $map = array();
     foreach($msgs as $k=>$msg) {
-        $sends = $rcmail->imap->decode_address_list($msg->headers->to);
+        $sends = $rcmail->storage->decode_address_list($msg->headers->to);
         $map[$k] = array();
         foreach($sends as $send) {
             $addr = $send['mailto'];
             $ret = $this->look_contact($addr);
             $map[$k] = array_merge($map[$k],$ret);
         }
-        $addr = $rcmail->imap->decode_address_list($msg->headers->from);
+        $addr = $rcmail->storage->decode_address_list($msg->headers->from);
         if($addr) $addr = array_shift($addr);
         if(!isset($addr['mailto']) || !$addr['mailto']) {
             $map[$k] = false;
@@ -206,7 +207,7 @@ class epesi_archive extends rcube_plugin
             foreach ($msg->mime_parts as $mime_id => $part) {
                 $mimetype = strtolower($part->ctype_primary . '/' . $part->ctype_secondary);
                 if ($mimetype == 'text/html') {
-                    $body = $rcmail->imap->get_message_part($msg->uid, $mime_id, $part);
+                    $body = $rcmail->storage->get_message_part($msg->uid, $mime_id, $part);
                     if(isset($part->replaces))
                         $cid_map = $part->replaces;
                     else
@@ -215,12 +216,12 @@ class epesi_archive extends rcube_plugin
                 }
             }
             foreach($cid_map as $k=>&$v) {
-                $x = strrchr($v,'=');
-                if(!$x) unset($cid_map[$k]);
-                else {
-                    $mid = substr($x,1);
+                if(preg_match('/_part=(.*?)&/',$v,$matches)) {
+                    $mid = $matches[1];
                     if(isset($mime_map[$mid]))
                         $v = 'get.php?'.http_build_query(array('mail_id'=>'__MAIL_ID__','mime_id'=>$mime_map[$mid]));
+                } else {
+                    unset($cid_map[$k]);
                 }
             }
             $body = rcmail_wash_html($body,array('safe'=>true,'inline_html'=>true),$cid_map);
@@ -231,10 +232,16 @@ class epesi_archive extends rcube_plugin
         $headers = array();
         foreach($msg->headers as $k=>$v) {
             if(is_string($v) && $k!='from' && $k!='to' && $k!='body_structure')
-                $headers[] = $k.': '.$rcmail->imap->decode_header($v);
+                $headers[] = $k.': '.rcube_mime::decode_mime_string((string)$v);
+        }
+        $message_id = $msg->get_header('messageID');
+        if(Utils_RecordBrowserCommon::get_records_count('rc_mails',array('message_id'=>$message_id))>0) {
+            $rcmail->output->command('display_message',$this->gettext('archived_duplicate'), 'warning');
+            return false;
         }
         $employee = DB::GetOne('SELECT id FROM contact_data_1 WHERE active=1 AND f_login=%d',array($E_SESSION['user']));
-        $id = Utils_RecordBrowserCommon::new_record('rc_mails',array('contacts'=>$contacts,'date'=>$date,'employee'=>$employee,'subject'=>substr($msg->subject,0,256),'body'=>$body,'headers_data'=>implode("\n",$headers),'from'=>$rcmail->imap->decode_header($msg->headers->from),'to'=>$rcmail->imap->decode_header($msg->headers->to)));
+        $data = array('message_id'=>$message_id,'references'=>$msg->get_header('references'),'contacts'=>$contacts,'date'=>$date,'subject'=>substr($msg->subject,0,256),'body'=>$body,'headers_data'=>implode("\n",$headers),'from'=>$rcmail->storage->decode_header($msg->headers->from),'to'=>$rcmail->storage->decode_header($msg->headers->to),'employee'=>$employee);
+        $id = Utils_RecordBrowserCommon::new_record('rc_mails',$data);
         $epesi_mails[] = $id;
         foreach($contacts as $c) {
             list($rs,$con_id) = explode(':',$c);
@@ -288,15 +295,15 @@ class epesi_archive extends rcube_plugin
   function add_mailbox($p) {
     if($p['root']=='') {
         $rcmail = rcmail::get_instance();
-        if(!$rcmail->imap->mailbox_exists($this->archive_mbox))
-            $rcmail->imap->create_mailbox($this->archive_mbox,true);
-        elseif(!$rcmail->imap->mailbox_exists($this->archive_mbox,true))
-            $rcmail->imap->subscribe($this->archive_mbox);
+        if(!$rcmail->storage->mailbox_exists($this->archive_mbox))
+            $rcmail->storage->create_mailbox($this->archive_mbox,true);
+        elseif(!$rcmail->storage->mailbox_exists($this->archive_mbox,true))
+            $rcmail->storage->subscribe($this->archive_mbox);
 
-        if(!$rcmail->imap->mailbox_exists($this->archive_sent_mbox))
-            $rcmail->imap->create_mailbox($this->archive_sent_mbox,true);
-        elseif(!$rcmail->imap->mailbox_exists($this->archive_sent_mbox,true))
-            $rcmail->imap->subscribe($this->archive_sent_mbox);
+        if(!$rcmail->storage->mailbox_exists($this->archive_sent_mbox))
+            $rcmail->storage->create_mailbox($this->archive_sent_mbox,true);
+        elseif(!$rcmail->storage->mailbox_exists($this->archive_sent_mbox,true))
+            $rcmail->storage->subscribe($this->archive_sent_mbox);
     }
   }
 
@@ -305,12 +312,13 @@ class epesi_archive extends rcube_plugin
     if(!$_SESSION['epesi_auto_archive']) return;
     unset($_SESSION['epesi_auto_archive']);
     
-    global $store_folder,$saved,$IMAP,$message_id,$store_target;
+    global $store_folder,$saved,$message_id,$store_target;
+    $IMAP = $imap = rcmail::get_instance()->storage;
     if(!$store_folder || !$saved) return;
     $rcmail = rcmail::get_instance();
     
     $msgid = strtr($message_id, array('>' => '', '<' => ''));  
-    $old_mbox = $IMAP->get_mailbox_name();
+    $old_mbox = $IMAP->get_folder();
 
     $IMAP->set_mailbox($store_target);
     $uids = $IMAP->search_once('', 'HEADER Message-ID '.$msgid, true);
@@ -333,7 +341,7 @@ class epesi_archive extends rcube_plugin
   }
   
   function list_messages($p) {
-    global $IMAP;
+    $IMAP = $imap = rcmail::get_instance()->storage;
     $mbox = $IMAP->get_mailbox_name();
     if($mbox=='Epesi Archive Sent') {
         foreach($p['cols'] as &$c) {

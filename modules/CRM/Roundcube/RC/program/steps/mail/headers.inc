@@ -4,8 +4,11 @@
  | program/steps/mail/headers.inc                                        |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2007, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2007, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Fetch message headers in raw format for display                     |
@@ -14,16 +17,17 @@
  | Author: Aleksander Machniak <alec@alec.pl>                            |
  +-----------------------------------------------------------------------+
 
- $Id: headers.inc 3989 2010-09-25 13:03:53Z alec $
+ $Id$
 
 */
 
 if ($uid = get_input_value('_uid', RCUBE_INPUT_POST))
 {
-    $source = $IMAP->get_raw_headers($uid);
+    $source = $RCMAIL->storage->get_raw_headers($uid);
 
     if ($source !== false) {
-        $source = htmlspecialchars(trim($source));
+        $source = trim(rcube_charset::clean($source));
+        $source = htmlspecialchars($source);
         $source = preg_replace(
             array(
                 '/\n[\t\s]+/',

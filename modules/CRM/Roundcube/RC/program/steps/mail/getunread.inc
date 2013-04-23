@@ -5,8 +5,11 @@
  | program/steps/mail/getunread.inc                                      |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2009, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2009, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Check all mailboxes for unread messages and update GUI              |
@@ -15,15 +18,15 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: getunread.inc 4294 2010-12-01 09:52:23Z alec $
+ $Id$
 
 */
 
-$a_folders = $IMAP->list_mailboxes();
+$a_folders = $RCMAIL->storage->list_folders_subscribed('', '*', 'mail');
 
 if (!empty($a_folders))
 {
-  $current = $IMAP->get_mailbox_name();
+  $current = $RCMAIL->storage->get_folder();
   $inbox = ($current == 'INBOX');
   $check_all = (bool)$RCMAIL->config->get('check_all_folders');
 
@@ -33,7 +36,7 @@ if (!empty($a_folders))
     if (!$check_all && $unseen_old !== null && $mbox_row != $current)
       $unseen = $unseen_old;
     else
-      $unseen = $IMAP->messagecount($mbox_row, 'UNSEEN', $unseen_old === null);
+      $unseen = $RCMAIL->storage->count($mbox_row, 'UNSEEN', $unseen_old === null);
 
     if ($unseen || $unseen_old === null) {
       $OUTPUT->command('set_unread_count', $mbox_row, $unseen, $inbox && $mbox_row == 'INBOX');

@@ -228,6 +228,9 @@ class Base_EpesiStoreCommon extends Base_AdminModuleCommon {
      * @return mixed string with error message or true on success
      */
     public static function download_module($module_license) {
+        // downloading invalidates updates count so remove
+        // store updates count to perform check again next time.
+        Variable::delete('epesi_store_updates', false);
         try {
             $file = self::download_module_file($module_license);
             self::extract_module_file($file);
@@ -393,11 +396,24 @@ class Base_EpesiStoreCommon extends Base_AdminModuleCommon {
     }
 
     private static function crc_file_matches($file, $crc) {
+        static $is_php_526 = null;
         if (!is_readable($file))
             return false;
-        $file_crc = hexdec(@hash_file("crc32b", $file));
+        $crc_hex = @hash_file("crc32b", $file);
+        $file_crc = hexdec($crc_hex);
         if ($file_crc == $crc)
             return true;
+        // failsafe for 5.2.6 due to bug https://bugs.php.net/bug.php?id=45028
+        if ($is_php_526 === null) {
+            $phpversion = substr(phpversion(),0,strpos(phpversion(), '-'));
+            $is_php_526 = (version_compare("5.2.6", $phpversion) == 0);
+        }
+        if ($is_php_526) {
+            $rev_crc_hex = implode('', array_reverse(str_split($crc_hex, 2)));
+            $file_crc = hexdec($rev_crc_hex);
+            if ($file_crc == $crc)
+                return true;
+        }
         // crc may be negative - sprintf as unsigned
         return $file_crc == sprintf("%u", $crc);
     }
@@ -465,8 +481,9 @@ class Base_EpesiStoreCommon extends Base_AdminModuleCommon {
         if (is_array($response)) {
             foreach ($response as $mod) {
                 if (isset($modules[$mod['id']]) &&
-                        self::version_compare($mod['version'], $modules[$mod['id']]['version']) > 0)
+                        self::version_compare($mod['version'], $modules[$mod['id']]['version']) > 0) {
                     $updates++;
+                }
             }
         }
         return $updates;

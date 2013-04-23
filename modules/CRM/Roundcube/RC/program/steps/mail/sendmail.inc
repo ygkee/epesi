@@ -5,8 +5,11 @@
  | program/steps/mail/sendmail.inc                                       |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2010, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2011, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Compose a new mail message with all headers and attachments         |
@@ -16,7 +19,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: sendmail.inc 4509 2011-02-09 10:51:50Z thomasb $
+ $Id$
 
 */
 
@@ -26,9 +29,12 @@ $OUTPUT->framed = TRUE;
 
 $savedraft = !empty($_POST['_draft']) ? true : false;
 
+$COMPOSE_ID = get_input_value('_id', RCUBE_INPUT_GPC);
+$COMPOSE    =& $_SESSION['compose_data_'.$COMPOSE_ID];
+
 /****** checks ********/
 
-if (!isset($_SESSION['compose']['id'])) {
+if (!isset($COMPOSE['id'])) {
   raise_error(array('code' => 500, 'type' => 'php',
     'file' => __FILE__, 'line' => __LINE__,
     'message' => "Invalid compose ID"), true, false);
@@ -69,9 +75,9 @@ function rcmail_encrypt_header($what)
 // get identity record
 function rcmail_get_identity($id)
 {
-  global $USER, $OUTPUT;
+  global $RCMAIL, $OUTPUT;
 
-  if ($sql_arr = $USER->get_identity($id)) {
+  if ($sql_arr = $RCMAIL->user->get_identity($id)) {
     $out = $sql_arr;
     $out['mailto'] = $sql_arr['email'];
     $out['string'] = format_email_recipient($sql_arr['email'],
@@ -135,44 +141,51 @@ function rcmail_fix_emoticon_paths(&$mime_message)
   return $body;
 }
 
-// parse email address input (and count addresses)
+/**
+ * Parse and cleanup email address input (and count addresses)
+ *
+ * @param string  Address input
+ * @param boolean Do count recipients (saved in global $RECIPIENT_COUNT)
+ * @param boolean Validate addresses (errors saved in global $EMAIL_FORMAT_ERROR)
+ * @return string Canonical recipients string separated by comma
+ */
 function rcmail_email_input_format($mailto, $count=false, $check=true)
 {
-  global $EMAIL_FORMAT_ERROR, $RECIPIENT_COUNT;
+  global $RCMAIL, $EMAIL_FORMAT_ERROR, $RECIPIENT_COUNT;
 
-  $regexp = array('/[,;]\s*[\r\n]+/', '/[\r\n]+/', '/[,;]\s*$/m', '/;/', '/(\S{1})(<\S+@\S+>)/U');
-  $replace = array(', ', ', ', '', ',', '\\1 \\2');
+  // simplified email regexp, supporting quoted local part
+  $email_regexp = '(\S+|("[^"]+"))@\S+';
+
+  $delim = trim($RCMAIL->config->get('recipients_separator', ','));
+  $regexp  = array("/[,;$delim]\s*[\r\n]+/", '/[\r\n]+/', "/[,;$delim]\s*\$/m", '/;/', '/(\S{1})(<'.$email_regexp.'>)/U');
+  $replace = array($delim.' ', ', ', '', $delim, '\\1 \\2');
 
   // replace new lines and strip ending ', ', make address input more valid
   $mailto = trim(preg_replace($regexp, $replace, $mailto));
 
   $result = array();
-  $items = rcube_explode_quoted_string(',', $mailto);
+  $items = rcube_explode_quoted_string($delim, $mailto);
 
   foreach($items as $item) {
     $item = trim($item);
     // address in brackets without name (do nothing)
-    if (preg_match('/^<\S+@\S+>$/', $item)) {
-      $item = rcube_idn_to_ascii($item);
-      $result[] = $item;
+    if (preg_match('/^<'.$email_regexp.'>$/', $item)) {
+      $item = rcube_idn_to_ascii(trim($item, '<>'));
+      $result[] = '<' . $item . '>';
     // address without brackets and without name (add brackets)
-    } else if (preg_match('/^\S+@\S+$/', $item)) {
+    } else if (preg_match('/^'.$email_regexp.'$/', $item)) {
       $item = rcube_idn_to_ascii($item);
-      $result[] = '<'.$item.'>';
+      $result[] = '<' . $item . '>';
     // address with name (handle name)
-    } else if (preg_match('/\S+@\S+>*$/', $item, $matches)) {
+    } else if (preg_match('/<*'.$email_regexp.'>*$/', $item, $matches)) {
       $address = $matches[0];
-      $name = str_replace($address, '', $item);
-      $name = trim($name);
-      if ($name && ($name[0] != '"' || $name[strlen($name)-1] != '"')
-          && preg_match('/[\(\)\<\>\\\.\[\]@,;:"]/', $name)) {
-            $name = '"'.addcslashes($name, '"').'"';
+      $name = trim(str_replace($address, '', $item));
+      if ($name[0] == '"' && $name[count($name)-1] == '"') {
+        $name = substr($name, 1, -1);
       }
-      $address = rcube_idn_to_ascii($address);
-      if (!preg_match('/^<\S+@\S+>$/', $address))
-        $address = '<'.$address.'>';
-
-      $result[] = $name.' '.$address;
+      $name = stripcslashes($name);
+      $address = rcube_idn_to_ascii(trim($address, '<>'));
+      $result[] = format_email_recipient($address, $name);
       $item = $address;
     } else if (trim($item)) {
       continue;
@@ -334,20 +347,20 @@ if (!empty($headers['Reply-To'])) {
 if (!empty($_POST['_followupto'])) {
   $headers['Mail-Followup-To'] = rcmail_email_input_format(get_input_value('_followupto', RCUBE_INPUT_POST, TRUE, $message_charset));
 }
-if (!empty($_SESSION['compose']['reply_msgid'])) {
-  $headers['In-Reply-To'] = $_SESSION['compose']['reply_msgid'];
+if (!empty($COMPOSE['reply_msgid'])) {
+  $headers['In-Reply-To'] = $COMPOSE['reply_msgid'];
 }
 
 // remember reply/forward UIDs in special headers
-if (!empty($_SESSION['compose']['reply_uid']) && $savedraft) {
-  $headers['X-Draft-Info'] = array('type' => 'reply', 'uid' => $_SESSION['compose']['reply_uid']);
+if (!empty($COMPOSE['reply_uid']) && $savedraft) {
+  $headers['X-Draft-Info'] = array('type' => 'reply', 'uid' => $COMPOSE['reply_uid']);
 }
-else if (!empty($_SESSION['compose']['forward_uid']) && $savedraft) {
-  $headers['X-Draft-Info'] = array('type' => 'forward', 'uid' => $_SESSION['compose']['forward_uid']);
+else if (!empty($COMPOSE['forward_uid']) && $savedraft) {
+  $headers['X-Draft-Info'] = array('type' => 'forward', 'uid' => $COMPOSE['forward_uid']);
 }
 
-if (!empty($_SESSION['compose']['references'])) {
-  $headers['References'] = $_SESSION['compose']['references'];
+if (!empty($COMPOSE['references'])) {
+  $headers['References'] = $COMPOSE['references'];
 }
 
 if (!empty($_POST['_priority'])) {
@@ -368,7 +381,7 @@ $headers['Message-ID'] = $message_id;
 $headers['X-Sender'] = $from;
 
 if (is_array($headers['X-Draft-Info'])) {
-  $headers['X-Draft-Info'] = rcmail_draftinfo_encode($headers['X-Draft-Info'] + array('folder' => $_SESSION['compose']['mailbox']));
+  $headers['X-Draft-Info'] = rcmail_draftinfo_encode($headers['X-Draft-Info'] + array('folder' => $COMPOSE['mailbox']));
 }
 if (!empty($CONFIG['useragent'])) {
   $headers['User-Agent'] = $CONFIG['useragent'];
@@ -391,6 +404,15 @@ $isHtml = (bool) get_input_value('_is_html', RCUBE_INPUT_POST);
 // fetch message body
 $message_body = get_input_value('_message', RCUBE_INPUT_POST, TRUE, $message_charset);
 
+if ($isHtml) {
+  $font   = rcube_fontdefs($RCMAIL->config->get('default_font', 'Verdana'));
+  $bstyle = $font && is_string($font) ? " style='font-family: $font'" : '';
+
+  // append doctype and html/body wrappers
+  $message_body = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">' .
+    "\r\n<html><body$bstyle>\r\n" . $message_body;
+}
+
 if (!$savedraft) {
   if ($isHtml) {
     // remove signature's div ID
@@ -400,10 +422,23 @@ if (!$savedraft) {
     $bstyle = 'padding-left:5px; border-left:#1010ff 2px solid; margin-left:5px; width:100%';
     $message_body = preg_replace('/<blockquote>/',
       '<blockquote type="cite" style="'.$bstyle.'">', $message_body);
+  }
 
-    // append doctype and html/body wrappers
-    $message_body = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">' .
-      "\r\n<html><body>\r\n" . $message_body;
+  // Check spelling before send
+  if ($CONFIG['spellcheck_before_send'] && $CONFIG['enable_spellcheck']
+    && empty($COMPOSE['spell_checked']) && !empty($message_body)
+  ) {
+    $spellchecker = new rcube_spellchecker(get_input_value('_lang', RCUBE_INPUT_GPC));
+    $spell_result = $spellchecker->check($message_body, $isHtml);
+
+    $COMPOSE['spell_checked'] = true;
+
+    if (!$spell_result) {
+      $result = $isHtml ? $spellchecker->get_words() : $spellchecker->get_xml();
+      $OUTPUT->show_message('mispellingsfound', 'error');
+      $OUTPUT->command('spellcheck_resume', $isHtml, $result);
+      $OUTPUT->send('iframe');
+    }
   }
 
   // generic footer for all messages
@@ -417,10 +452,13 @@ if (!$savedraft) {
     if ($isHtml)
       $footer = '<pre>'.$footer.'</pre>';
   }
+
   if ($footer)
     $message_body .= "\r\n" . $footer;
-  if ($isHtml)
-    $message_body .= "\r\n</body></html>\r\n";
+}
+
+if ($isHtml) {
+  $message_body .= "\r\n</body></html>\r\n";
 }
 
 // set line length for body wrapping
@@ -434,12 +472,12 @@ $MAIL_MIME = new Mail_mime("\r\n");
 
 // Check if we have enough memory to handle the message in it
 // It's faster than using files, so we'll do this if we only can
-if (is_array($_SESSION['compose']['attachments']) && $CONFIG['smtp_server']
+if (is_array($COMPOSE['attachments']) && $CONFIG['smtp_server']
   && ($mem_limit = parse_bytes(ini_get('memory_limit'))))
 {
   $memory = function_exists('memory_get_usage') ? memory_get_usage() : 16*1024*1024; // safe value: 16MB
 
-  foreach ($_SESSION['compose']['attachments'] as $id => $attachment)
+  foreach ($COMPOSE['attachments'] as $id => $attachment)
     $memory += $attachment['size'];
 
   // Yeah, Net_SMTP needs up to 12x more memory, 1.33 is for base64
@@ -463,14 +501,9 @@ if ($isHtml) {
   $h2t = new html2text($plugin['body'], false, true, 0);
   $plainTextPart = rc_wordwrap($h2t->get_text(), $LINE_LENGTH, "\r\n");
   $plainTextPart = wordwrap($plainTextPart, 998, "\r\n", true);
-  if (!$plainTextPart) {
-    // empty message body breaks attachment handling in drafts
-    $plainTextPart = "\r\n";
-  }
-  else {
-    // make sure all line endings are CRLF (#1486712)
-    $plainTextPart = preg_replace('/\r?\n/', "\r\n", $plainTextPart);
-  }
+
+  // make sure all line endings are CRLF (#1486712)
+  $plainTextPart = preg_replace('/\r?\n/', "\r\n", $plainTextPart);
 
   $plugin = $RCMAIL->plugins->exec_hook('message_outgoing_body',
     array('body' => $plainTextPart, 'type' => 'alternative', 'message' => $MAIL_MIME));
@@ -489,23 +522,19 @@ else {
 
   // compose format=flowed content if enabled
   if ($flowed = $RCMAIL->config->get('send_format_flowed', true))
-    $message_body = rcube_message::format_flowed($message_body, min($LINE_LENGTH+2, 79));
+    $message_body = rcube_mime::format_flowed($message_body, min($LINE_LENGTH+2, 79));
   else
     $message_body = rc_wordwrap($message_body, $LINE_LENGTH, "\r\n");
 
   $message_body = wordwrap($message_body, 998, "\r\n", true);
-  if (!strlen($message_body)) { 
-    // empty message body breaks attachment handling in drafts 
-    $message_body = "\r\n"; 
-  }
 
   $MAIL_MIME->setTXTBody($message_body, false, true);
 }
 
 // add stored attachments, if any
-if (is_array($_SESSION['compose']['attachments']))
+if (is_array($COMPOSE['attachments']))
 {
-  foreach ($_SESSION['compose']['attachments'] as $id => $attachment) {
+  foreach ($COMPOSE['attachments'] as $id => $attachment) {
     // This hook retrieves the attachment contents from the file storage backend
     $attachment = $RCMAIL->plugins->exec_hook('attachment_get', $attachment);
 
@@ -600,12 +629,12 @@ if (!$savedraft)
   // save message sent time
   if (!empty($CONFIG['sendmail_delay']))
     $RCMAIL->user->save_prefs(array('last_message_time' => time()));
-  
+
   // set replied/forwarded flag
-  if ($_SESSION['compose']['reply_uid'])
-    $IMAP->set_flag($_SESSION['compose']['reply_uid'], 'ANSWERED', $_SESSION['compose']['mailbox']);
-  else if ($_SESSION['compose']['forward_uid'])
-    $IMAP->set_flag($_SESSION['compose']['forward_uid'], 'FORWARDED', $_SESSION['compose']['mailbox']);
+  if ($COMPOSE['reply_uid'])
+    $RCMAIL->storage->set_flag($COMPOSE['reply_uid'], 'ANSWERED', $COMPOSE['mailbox']);
+  else if ($COMPOSE['forward_uid'])
+    $RCMAIL->storage->set_flag($COMPOSE['forward_uid'], 'FORWARDED', $COMPOSE['mailbox']);
 
 } // End of SMTP Delivery Block
 
@@ -613,27 +642,25 @@ if (!$savedraft)
 // Determine which folder to save message
 if ($savedraft)
   $store_target = $CONFIG['drafts_mbox'];
-else	
+else
   $store_target = isset($_POST['_store_target']) ? get_input_value('_store_target', RCUBE_INPUT_POST) : $CONFIG['sent_mbox'];
 
-if ($store_target)
-  {
+if ($store_target) {
   // check if folder is subscribed
-  if ($IMAP->mailbox_exists($store_target, true))
+  if ($RCMAIL->storage->folder_exists($store_target, true))
     $store_folder = true;
   // folder may be existing but not subscribed (#1485241)
-  else if (!$IMAP->mailbox_exists($store_target))
-    $store_folder = $IMAP->create_mailbox($store_target, true);
-  else if ($IMAP->subscribe($store_target))
+  else if (!$RCMAIL->storage->folder_exists($store_target))
+    $store_folder = $RCMAIL->storage->create_folder($store_target, true);
+  else if ($RCMAIL->storage->subscribe($store_target))
     $store_folder = true;
 
   // append message to sent box
   if ($store_folder) {
-
     // message body in file
     if ($mailbody_file || $MAIL_MIME->getParam('delay_file_io')) {
       $headers = $MAIL_MIME->txtHeaders();
-      
+
       // file already created
       if ($mailbody_file)
         $msg = $mailbody_file;
@@ -642,70 +669,78 @@ if ($store_target)
         $mailbody_file = tempnam($temp_dir, 'rcmMsg');
         if (!PEAR::isError($msg = $MAIL_MIME->saveMessageBody($mailbody_file)))
           $msg = $mailbody_file;
-        }
       }
+    }
     else {
       $msg = $MAIL_MIME->getMessage();
       $headers = '';
-      }
+    }
 
     if (PEAR::isError($msg))
-      raise_error(array('code' => 600, 'type' => 'php',
+      raise_error(array('code' => 650, 'type' => 'php',
 	    'file' => __FILE__, 'line' => __LINE__,
             'message' => "Could not create message: ".$msg->getMessage()),
             TRUE, FALSE);
     else {
-      $saved = $IMAP->save_message($store_target, $msg, $headers, $mailbody_file ? true : false);
-      }
+      $saved = $RCMAIL->storage->save_message($store_target, $msg, $headers, $mailbody_file ? true : false);
+    }
 
     if ($mailbody_file) {
       unlink($mailbody_file);
       $mailbody_file = null;
-      }
-
-    // raise error if saving failed
-    if (!$saved) {
-      raise_error(array('code' => 800, 'type' => 'imap',
-	    'file' => __FILE__, 'line' => __LINE__,
-            'message' => "Could not save message in $store_target"), TRUE, FALSE);
-    
-      if ($savedraft) {
-        $OUTPUT->show_message('errorsaving', 'error');
-        $OUTPUT->send('iframe');
-        }
-      }
-    }
-
-  if ($olddraftmessageid)
-    {
-    // delete previous saved draft
-    $a_deleteid = $IMAP->search_once($CONFIG['drafts_mbox'],
-        'HEADER Message-ID '.$olddraftmessageid, true);
-    $deleted = $IMAP->delete_message($a_deleteid, $CONFIG['drafts_mbox']);
-
-    // raise error if deletion of old draft failed
-    if (!$deleted)
-      raise_error(array('code' => 800, 'type' => 'imap',
-    		'file' => __FILE__, 'line' => __LINE__,
-                'message' => "Could not delete message from ".$CONFIG['drafts_mbox']), TRUE, FALSE);
     }
   }
+
+  // raise error if saving failed
+  if (!$saved) {
+    raise_error(array('code' => 800, 'type' => 'imap',
+       'file' => __FILE__, 'line' => __LINE__,
+       'message' => "Could not save message in $store_target"), TRUE, FALSE);
+
+    if ($savedraft) {
+      $OUTPUT->show_message('errorsaving', 'error');
+      // start the auto-save timer again
+      $OUTPUT->command('auto_save_start');
+      $OUTPUT->send('iframe');
+    }
+  }
+
+  if ($olddraftmessageid) {
+    // delete previous saved draft
+    // @TODO: use message UID (remember to check UIDVALIDITY) to skip this SEARCH
+    $delete_idx = $RCMAIL->storage->search_once($CONFIG['drafts_mbox'],
+        'HEADER Message-ID '.$olddraftmessageid);
+
+    if ($del_uid = $delete_idx->get_element('FIRST')) {
+      $deleted = $RCMAIL->storage->delete_message($del_uid, $CONFIG['drafts_mbox']);
+
+      // raise error if deletion of old draft failed
+      if (!$deleted)
+        raise_error(array('code' => 800, 'type' => 'imap',
+          'file' => __FILE__, 'line' => __LINE__,
+          'message' => "Could not delete message from ".$CONFIG['drafts_mbox']), TRUE, FALSE);
+    }
+  }
+}
 // remove temp file
 else if ($mailbody_file) {
   unlink($mailbody_file);
-  }
+}
 
 
-if ($savedraft)
-  {
+if ($savedraft) {
   $msgid = strtr($message_id, array('>' => '', '<' => ''));
-  
-  // remember new draft-uid
-  $draftuids = $IMAP->search_once($CONFIG['drafts_mbox'], 'HEADER Message-ID '.$msgid, true);
-  $_SESSION['compose']['param']['_draft_uid'] = $draftuids[0];
+
+  // remember new draft-uid ($saved could be an UID or TRUE here)
+  if (is_bool($saved)) {
+    $draft_idx = $RCMAIL->storage->search_once($CONFIG['drafts_mbox'], 'HEADER Message-ID '.$msgid);
+    $saved     = $draft_idx->get_element('FIRST');
+  }
+  $COMPOSE['param']['draft_uid'] = $saved;
+  $plugin = $RCMAIL->plugins->exec_hook('message_draftsaved', array('msgid' => $msgid, 'uid' => $saved, 'folder' => $store_target));
 
   // display success
-  $OUTPUT->show_message('messagesaved', 'confirmation');
+  $OUTPUT->show_message($plugin['message'] ? $plugin['message'] : 'messagesaved', 'confirmation');
 
   // update "_draft_saveid" and the "cmp_hash" to prevent "Unsaved changes" warning
   $OUTPUT->command('set_draft_id', $msgid);
@@ -715,16 +750,13 @@ if ($savedraft)
   $OUTPUT->command('auto_save_start');
 
   $OUTPUT->send('iframe');
-  }
-else
-  {
-  rcmail_compose_cleanup();
+}
+else {
+  rcmail_compose_cleanup($COMPOSE_ID);
 
   if ($store_folder && !$saved)
     $OUTPUT->command('sent_successfully', 'error', rcube_label('errorsavingsent'));
   else
     $OUTPUT->command('sent_successfully', 'confirmation', rcube_label('messagesent'));
   $OUTPUT->send('iframe');
-  }
-
-
+}

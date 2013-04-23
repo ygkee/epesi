@@ -42,8 +42,8 @@ class zipdownload extends rcube_plugin
 		$rcmail = rcmail::get_instance();
 
 		// only show the link if there is more than the configured number of attachments
-		if (substr_count($p['content'], '<li>') > $rcmail->config->get('zipdownload_attachments', 1)) {
-			$link = html::tag('li', null,
+		if (substr_count($p['content'], '<li ') > $rcmail->config->get('zipdownload_attachments', 1)) {
+			$link = html::tag('li', array('class' => 'application zip zip'),
 				html::a(array(
 					'href' => rcmail_url('plugin.zipdownload.zip_attachments', array('_mbox' => $rcmail->output->env['mailbox'], '_uid' => $rcmail->output->env['uid'])),
 					'title' => $this->gettext('downloadall'),
@@ -60,7 +60,7 @@ class zipdownload extends rcube_plugin
 	function download_attachments()
 	{
 		$rcmail = rcmail::get_instance();
-		$imap = $rcmail->imap;
+		$imap = $rcmail->storage;
 		$temp_dir = $rcmail->config->get('temp_dir');
 		$tmpfname = tempnam($temp_dir, 'attachments');
 		$message = new rcube_message(get_input_value('_uid', RCUBE_INPUT_GET));
@@ -125,8 +125,8 @@ class zipdownload extends rcube_plugin
 
 	function download_folder()
 	{
-		$imap = rcmail::get_instance()->imap;
-		$mbox_name = $imap->get_mailbox_name();
+		$imap = rcmail::get_instance()->storage;
+		$mbox_name = $imap->get_folder();
 
 		// initialize searching result if search_filter is used
 		if ($_SESSION['search_filter'] && $_SESSION['search_filter'] != 'ALL') {
@@ -136,9 +136,9 @@ class zipdownload extends rcube_plugin
 
 		// fetch message headers for all pages
 		$uids = array();
-		if ($count = $imap->messagecount($mbox_name, $imap->threading ? 'THREADS' : 'ALL', FALSE)) {
-			for ($i = 0; ($i * $imap->page_size) <= $count; $i++) {
-				$a_headers = $imap->list_headers($mbox_name, ($i + 1));
+		if ($count = $imap->count($mbox_name, $imap->get_threading() ? 'THREADS' : 'ALL', FALSE)) {
+			for ($i = 0; ($i * $imap->get_pagesize()) <= $count; $i++) {
+				$a_headers = $imap->list_messages($mbox_name, ($i + 1));
 
 				foreach ($a_headers as $n => $header) {
 					if (empty($header))
@@ -156,7 +156,7 @@ class zipdownload extends rcube_plugin
 	private function _download_messages($uids)
 	{
 		$rcmail = rcmail::get_instance();
-		$imap = $rcmail->imap;
+		$imap = $rcmail->storage;
 		$temp_dir = $rcmail->config->get('temp_dir');
 		$tmpfname = tempnam($temp_dir, 'messages');
 
@@ -166,8 +166,8 @@ class zipdownload extends rcube_plugin
 
 		foreach ($uids as $key => $uid){
 			$message = $imap->get_raw_body($uid);
-			$headers = $imap->get_headers($uid);
-			$subject = $imap->decode_header($headers->subject);
+			$headers = $imap->get_message_headers($uid);
+			$subject = rcube_mime::decode_mime_string((string)$headers->subject);
 			$subject = $this->_convert_filename($subject, RCMAIL_CHARSET, $rcmail->config->get('zipdownload_charset'));
 			$subject = substr($subject, 0, 16);
 
@@ -185,7 +185,7 @@ class zipdownload extends rcube_plugin
 		$browser = new rcube_browser;
 		send_nocacheing_headers();
 
-		$filename = $imap->get_mailbox_name() . '.zip';
+		$filename = $imap->get_folder() . '.zip';
 
 		if ($browser->ie && $browser->ver < 7)
 			$filename = rawurlencode(abbreviate_string($filename, 55));

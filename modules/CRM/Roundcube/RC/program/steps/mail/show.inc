@@ -5,8 +5,11 @@
  | program/steps/mail/show.inc                                           |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2009, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2009, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Display a mail message similar as a usual mail application does     |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: show.inc 4294 2010-12-01 09:52:23Z alec $
+ $Id$
 
 */
 
@@ -30,16 +33,14 @@ if ($uid = get_input_value('_uid', RCUBE_INPUT_GET)) {
     rcmail_message_error($uid);
   }
 
-  send_nocacheing_headers();
-
-  $mbox_name = $IMAP->get_mailbox_name();
+  $mbox_name = $RCMAIL->storage->get_folder();
 
   // show images?
   rcmail_check_safe($MESSAGE);
 
   // set message charset as default
   if (!empty($MESSAGE->headers->charset))
-    $IMAP->set_charset($MESSAGE->headers->charset);
+    $RCMAIL->storage->set_charset($MESSAGE->headers->charset);
 
   $OUTPUT->set_pagetitle(abbreviate_string($MESSAGE->subject, 128, '...', true));
 
@@ -49,11 +50,21 @@ if ($uid = get_input_value('_uid', RCUBE_INPUT_GET)) {
   $OUTPUT->set_env('safemode', $MESSAGE->is_safe);
   $OUTPUT->set_env('sender', $MESSAGE->sender['string']);
   $OUTPUT->set_env('permaurl', rcmail_url('show', array('_uid' => $MESSAGE->uid, '_mbox' => $mbox_name)));
-  $OUTPUT->set_env('delimiter', $IMAP->get_hierarchy_delimiter());
+  $OUTPUT->set_env('delimiter', $RCMAIL->storage->get_hierarchy_delimiter());
   $OUTPUT->set_env('mailbox', $mbox_name);
 
+  // mimetypes supported by the browser (default settings)
+  $mimetypes = $RCMAIL->config->get('client_mimetypes', 'text/plain,text/html,text/xml,image/jpeg,image/gif,image/png,application/x-javascript,application/pdf,application/x-shockwave-flash');
+  $OUTPUT->set_env('mimetypes', is_string($mimetypes) ? explode(',', $mimetypes) : (array)$mimetypes);
+
+  if ($CONFIG['drafts_mbox'])
+    $OUTPUT->set_env('drafts_mailbox', $CONFIG['drafts_mbox']);
   if ($CONFIG['trash_mbox'])
     $OUTPUT->set_env('trash_mailbox', $CONFIG['trash_mbox']);
+  if ($CONFIG['junk_mbox'])
+    $OUTPUT->set_env('junk_mailbox', $CONFIG['junk_mbox']);
+  if ($CONFIG['delete_junk'])
+    $OUTPUT->set_env('delete_junk', true);
   if ($CONFIG['flag_for_deletion'])
     $OUTPUT->set_env('flag_for_deletion', true);
   if ($CONFIG['read_when_deleted'])
@@ -64,18 +75,21 @@ if ($uid = get_input_value('_uid', RCUBE_INPUT_GET)) {
     $OUTPUT->set_env('display_next', true);
   if ($MESSAGE->headers->others['list-post'])
     $OUTPUT->set_env('list_post', true);
+  if ($CONFIG['forward_attachment'])
+    $OUTPUT->set_env('forward_attachment', true);
 
   if (!$OUTPUT->ajax_call)
     $OUTPUT->add_label('checkingmail', 'deletemessage', 'movemessagetotrash',
       'movingmessage', 'deletingmessage');
 
   // check for unset disposition notification
-  if ($MESSAGE->headers->mdn_to &&
-      !$MESSAGE->headers->mdn_sent && !$MESSAGE->headers->seen &&
-      ($IMAP->check_permflag('MDNSENT') || $IMAP->check_permflag('*')) &&
-      $mbox_name != $CONFIG['drafts_mbox'] &&
-      $mbox_name != $CONFIG['sent_mbox'])
-  {
+  if ($MESSAGE->headers->mdn_to
+      && empty($MESSAGE->headers->flags['MDNSENT'])
+      && empty($MESSAGE->headers->flags['SEEN'])
+      && ($RCMAIL->storage->check_permflag('MDNSENT') || $RCMAIL->storage->check_permflag('*'))
+      && $mbox_name != $CONFIG['drafts_mbox']
+      && $mbox_name != $CONFIG['sent_mbox']
+  ) {
     $mdn_cfg = intval($CONFIG['mdn_requests']);
 
     if ($mdn_cfg == 1 || (($mdn_cfg == 3 || $mdn_cfg ==  4) && rcmail_contact_exists($MESSAGE->sender['mailto']))) {
@@ -94,9 +108,12 @@ if ($uid = get_input_value('_uid', RCUBE_INPUT_GET)) {
     }
   }
 
-  if (!$MESSAGE->headers->seen && ($RCMAIL->action == 'show' || ($RCMAIL->action == 'preview' && intval($CONFIG['preview_pane_mark_read']) == 0)))
+  if (empty($MESSAGE->headers->flags['SEEN'])
+    && ($RCMAIL->action == 'show' || ($RCMAIL->action == 'preview' && intval($CONFIG['preview_pane_mark_read']) == 0))
+  ) {
     $RCMAIL->plugins->exec_hook('message_read', array('uid' => $MESSAGE->uid,
       'mailbox' => $mbox_name, 'message' => $MESSAGE));
+  }
 }
 
 
@@ -122,9 +139,9 @@ function rcmail_message_attachments($attrib)
         $title = '';
       }
 
-        $ol .= html::tag('li', null,
+        $ol .= html::tag('li', rcmail_filetype2classname($attach_prop->mimetype, $attach_prop->filename),
           html::a(array(
-            'href' => $MESSAGE->get_part_url($attach_prop->mime_id),
+            'href' => $MESSAGE->get_part_url($attach_prop->mime_id, false),
             'onclick' => sprintf(
               'return %s.command(\'load-attachment\',{part:\'%s\', mimetype:\'%s\'},this)',
               JS_OBJECT_NAME,
@@ -142,12 +159,13 @@ function rcmail_message_attachments($attrib)
   return $out;
 }
 
-function rcmail_remote_objects_msg($attrib)
+function rcmail_remote_objects_msg()
 {
   global $MESSAGE, $RCMAIL;
 
-  if (!$attrib['id'])
-    $attrib['id'] = 'rcmremoteobjmsg';
+  $attrib['id']    = 'remote-objects-message';
+  $attrib['class'] = 'notice';
+  $attrib['style'] = 'display: none';
 
   $msg = Q(rcube_label('blockedimages')) . '&nbsp;';
   $msg .= html::a(array('href' => "#loadimages", 'onclick' => JS_OBJECT_NAME.".command('load-images')"), Q(rcube_label('showimages')));
@@ -160,6 +178,48 @@ function rcmail_remote_objects_msg($attrib)
 
   $RCMAIL->output->add_gui_object('remoteobjectsmsg', $attrib['id']);
   return html::div($attrib, $msg);
+}
+
+function rcmail_message_buttons()
+{
+  global $MESSAGE, $RCMAIL, $CONFIG;
+
+  $mbox  = $RCMAIL->storage->get_folder();
+  $delim = $RCMAIL->storage->get_hierarchy_delimiter();
+  $dbox  = $CONFIG['drafts_mbox'];
+
+  // the message is not a draft
+  if ($mbox != $dbox && strpos($mbox, $dbox.$delim) !== 0) {
+    return '';
+  }
+
+  $attrib['id']    = 'message-buttons';
+  $attrib['class'] = 'notice';
+
+  $msg = Q(rcube_label('isdraft')) . '&nbsp;';
+  $msg .= html::a(array('href' => "#edit", 'onclick' => JS_OBJECT_NAME.".command('edit')"), Q(rcube_label('edit')));
+
+  return html::div($attrib, $msg);
+}
+
+function rcmail_message_objects($attrib)
+{
+  global $RCMAIL, $MESSAGE;
+
+  if (!$attrib['id'])
+    $attrib['id'] = 'message-objects';
+
+  $content = array(
+    rcmail_message_buttons(),
+    rcmail_remote_objects_msg(),
+  );
+
+  $plugin = $RCMAIL->plugins->exec_hook('message_objects',
+    array('content' => $content, 'message' => $MESSAGE));
+
+  $content = implode("\n", $plugin['content']);
+
+  return html::div($attrib, $content);
 }
 
 function rcmail_contact_exists($email)
@@ -181,7 +241,8 @@ function rcmail_contact_exists($email)
 $OUTPUT->add_handlers(array(
   'messageattachments' => 'rcmail_message_attachments',
   'mailboxname' => 'rcmail_mailbox_name_display',
-  'blockedobjects' => 'rcmail_remote_objects_msg'));
+  'messageobjects' => 'rcmail_message_objects',
+));
 
 
 if ($RCMAIL->action=='print' && $OUTPUT->template_exists('messageprint'))
@@ -193,10 +254,10 @@ else
 
 
 // mark message as read
-if ($MESSAGE && $MESSAGE->headers && !$MESSAGE->headers->seen &&
+if ($MESSAGE && $MESSAGE->headers && empty($MESSAGE->headers->flags['SEEN']) &&
   ($RCMAIL->action == 'show' || ($RCMAIL->action == 'preview' && intval($CONFIG['preview_pane_mark_read']) == 0)))
 {
-  if ($IMAP->set_flag($MESSAGE->uid, 'SEEN')) {
+  if ($RCMAIL->storage->set_flag($MESSAGE->uid, 'SEEN')) {
     if ($count = rcmail_get_unseen_count($mbox_name)) {
       rcmail_set_unseen_count($mbox_name, $count - 1);
     }

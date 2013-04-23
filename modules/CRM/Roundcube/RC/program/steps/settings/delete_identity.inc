@@ -5,8 +5,11 @@
  | program/steps/settings/delete_identity.inc                            |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2009, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2009, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Delete the submitted identities (IIDs) from the database            |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: delete_identity.inc 4025 2010-09-30 13:24:33Z alec $
+ $Id$
 
 */
 
@@ -32,12 +35,12 @@ if ($iid && preg_match('/^[0-9]+(,[0-9]+)*$/', $iid))
 {
   $plugin = $RCMAIL->plugins->exec_hook('identity_delete', array('id' => $iid));
   
-  $deleted = !$plugin['abort'] ? $USER->delete_identity($iid) : $plugin['result'];
+  $deleted = !$plugin['abort'] ? $RCMAIL->user->delete_identity($iid) : $plugin['result'];
 
-  if ($deleted)
+  if ($deleted > 0 && $deleted !== false)
     $OUTPUT->show_message('deletedsuccessfully', 'confirmation', null, false);
   else
-    $OUTPUT->show_message($plugin['message'] ? $plugin['message'] : 'nodeletelastidentity', 'error', null, false);
+    $OUTPUT->show_message($plugin['message'] ? $plugin['message'] : ($deleted < 0 ? 'nodeletelastidentity' : 'errorsaving'), 'error', null, false);
 
   // send response
   if ($OUTPUT->ajax_call)

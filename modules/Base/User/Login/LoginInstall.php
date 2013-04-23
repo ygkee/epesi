@@ -36,6 +36,8 @@ class Base_User_LoginInstall extends ModuleInstall {
 			return false;
 		}
 		Variable::set('host_ban_time',300);
+        Variable::set('host_ban_nr_of_tries', 3);
+        Variable::set('host_ban_by_login', 0);
 		Base_ThemeCommon::install_default_theme('Base/User/Login');
 		return true;
 	}
@@ -43,6 +45,8 @@ class Base_User_LoginInstall extends ModuleInstall {
 	public function uninstall() {
 		Base_ThemeCommon::uninstall_default_theme('Base/User/Login');
 		Variable::delete('host_ban_time');
+        Variable::delete('host_ban_nr_of_tries');
+        Variable::delete('host_ban_by_login');
 		return DB::DropTable('user_password') && DB::DropTable('user_login_ban') && DB::DropTable('user_autologin') && DB::DropTable('user_reset_pass');
 	}
 

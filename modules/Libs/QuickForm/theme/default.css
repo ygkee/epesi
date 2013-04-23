@@ -45,7 +45,6 @@
 
 #quickform .element {
 	text-align: right;
-	vertical-align: top;
 	font-weight: normal;
 }
 
@@ -155,6 +154,8 @@
 	float: left;
 }
 
+.checkbox_on  { background-image: url('images/checkbox_on.png');  }
+.checkbox_off { background-image: url('images/checkbox_off.png'); }
 .radio_on     { background-image: url('images/radio_on.png');     }
 .radio_off    { background-image: url('images/radio_off.png');    }
 
@@ -371,6 +372,7 @@
 
 .automulti .button,
 .automulti .button:hover {
+	padding: 0;
     background-image: none;
     width: 80px;
 	display: table-cell;
@@ -516,7 +518,7 @@ div.autocomplete ul li.selected { background-color: #CCFFCC;}
 div.autocomplete ul li {
 	display:block;
 	padding:2px;
-	height:14px;
+	max-height:48px;
 	cursor:pointer;
 	white-space: nowrap;
 	overflow: hidden;

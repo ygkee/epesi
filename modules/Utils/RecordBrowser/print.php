@@ -23,6 +23,7 @@ $order = $_SESSION['client']['utils_recordbrowser'][$key]['order'];
 $admin = $_SESSION['client']['utils_recordbrowser'][$key]['admin'];
 $tab = $_SESSION['client']['utils_recordbrowser'][$key]['tab'];
 $more_table_properties = $_SESSION['client']['utils_recordbrowser'][$key]['more_table_properties'];
+$limit = $_SESSION['client']['utils_recordbrowser'][$key]['limit'];
 
 ModuleManager::load_modules();
 if (!Utils_RecordBrowserCommon::get_access($tab, 'print') && !Base_AclCommon::i_am_admin())
@@ -36,27 +37,31 @@ $rb->set_inline_display();
 $rb->set_header_properties($more_table_properties);
 
 ob_start();
-$rb->show_data($crits, $cols, $order, $admin, false, true);
+$rb->show_data($crits, $cols, $order, $admin, false, true, $limit);
 $html = ob_get_clean();
+
+$limit_info = '';
+if (is_array($limit)) {
+    $offset = $limit['offset'];
+    $per_page = $limit['numrows'];
+    $start = $offset + 1;
+    $end = $offset + $per_page;
+    $total = Utils_RecordBrowserCommon::get_records_count($tab, $crits, $admin, $order);
+    if ($end > $total)
+        $end = $total;
+    $limit_info = __('Records %s to %s of %s', array($start, $end, $total)) . "\n";
+}
 
 $tcpdf = Libs_TCPDFCommon::new_pdf();
 
-/*$filters = array();
-foreach ($crits as $k=>$v) {
-	$field = trim($k,'(|:"~<>=');
-	$args = Utils_RecordBrowserCommon::$table_rows[Utils_RecordBrowserCommon::$hash[$field]];
-	$val = Utils_RecordBrowserCommon::get_val($tab, $field, array($field=>$v), true, $args);
-	$filters[] = $args['name'].': '.$val;
-}
-$filters = implode('   ', $filters);
-$filters = str_replace('&nbsp;',' ',$filters);*/
 $filters = implode(' ',Utils_RecordBrowserCommon::crits_to_words($tab, $crits));
 $filters = strip_tags($filters);
 $filters = str_replace('&nbsp;', ' ', $filters);
 $filters = str_replace(' and ', "\n", $filters);
 $filters = str_replace(' is equal to', ':', $filters);
-	
-Libs_TCPDFCommon::prepare_header($tcpdf, _V(DB::GetOne('SELECT caption FROM recordbrowser_table_properties WHERE tab=%s', array($tab))), $filters, false);
+
+$subject = $limit_info . $filters;
+Libs_TCPDFCommon::prepare_header($tcpdf, _V(DB::GetOne('SELECT caption FROM recordbrowser_table_properties WHERE tab=%s', array($tab))), $subject, false);
 Libs_TCPDFCommon::add_page($tcpdf);
 
 Libs_TCPDFCommon::SetFont($tcpdf, Libs_TCPDFCommon::$default_font, '', 6);

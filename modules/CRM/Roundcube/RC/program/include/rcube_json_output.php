@@ -5,8 +5,11 @@
  | program/include/rcube_json_output.php                                 |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2008-2010, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2008-2010, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Class to handle HTML page output using a skin template.             |
@@ -16,7 +19,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: rcube_json_output.php 4139 2010-10-26 13:20:34Z alec $
+ $Id$
 
 */
 
@@ -75,7 +78,11 @@ class rcube_json_output
      */
     public function set_pagetitle($title)
     {
-        $name = $this->config->get('product_name');
+        if ($this->config->get('devel_mode') && !empty($_SESSION['username']))
+            $name = $_SESSION['username'];
+        else
+            $name = $this->config->get('product_name');
+
         $this->command('set_pagetitle', empty($name) ? $title : $name.' :: '.$title);
     }
 
@@ -164,17 +171,22 @@ class rcube_json_output
      * @param string  $type     Message type [notice|confirm|error]
      * @param array   $vars     Key-value pairs to be replaced in localized text
      * @param boolean $override Override last set message
+     * @param int     $timeout  Message displaying time in seconds
      * @uses self::command()
      */
-    public function show_message($message, $type='notice', $vars=null, $override=true)
+    public function show_message($message, $type='notice', $vars=null, $override=true, $timeout=0)
     {
         if ($override || !$this->message) {
+            if (rcube_label_exists($message)) {
+                if (!empty($vars))
+                    $vars = array_map('Q', $vars);
+                $msgtext = rcube_label(array('name' => $message, 'vars' => $vars));
+            }
+            else
+                $msgtext = $message;
+
             $this->message = $message;
-            $this->command(
-                'display_message',
-                rcube_label(array('name' => $message, 'vars' => $vars)),
-                $type
-            );
+            $this->command('display_message', $msgtext, $type, $timeout * 1000);
         }
     }
 
@@ -200,7 +212,7 @@ class rcube_json_output
     public function redirect($p = array(), $delay = 1)
     {
         $location = rcmail::get_instance()->url($p);
-        $this->remote_response("window.setTimeout(\"location.href='{$location}'\", $delay);");
+        $this->remote_response(sprintf("window.setTimeout(function(){ %s.redirect('%s',true); }, %d);", JS_OBJECT_NAME, $location, $delay));
         exit;
     }
 

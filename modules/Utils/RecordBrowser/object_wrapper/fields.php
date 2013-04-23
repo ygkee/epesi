@@ -138,6 +138,19 @@ class RBO_Field_Timestamp extends RBO_FieldDefinition {
 /**
  * @author Adam Bukowski <abukowski@telaxus.com>
  */
+class RBO_Field_Time extends RBO_FieldDefinition {
+
+    const type = 'time';
+
+    public function __construct($display_name) {
+        parent::__construct($display_name, self::type);
+    }
+
+}
+
+/**
+ * @author Adam Bukowski <abukowski@telaxus.com>
+ */
 class RBO_Field_Currency extends RBO_FieldDefinition {
 
     const type = 'currency';
@@ -269,6 +282,7 @@ class RBO_Field_CommonData extends RBO_FieldDefinition {
     private $chained_select_fields = array();
     private $commondata_array_name;
     private $order_by_key;
+    private $multiple = false;
 
     public function __construct($display_name, $commondata_array_name = null, $order_by_key = false) {
         $this->commondata_array_name = $commondata_array_name;
@@ -291,12 +305,22 @@ class RBO_Field_CommonData extends RBO_FieldDefinition {
      * @return RBO_Field_CommonData
      */
     public function set_order_by_key() {
-        $this->order_by_key = $value;
+        $this->order_by_key = true;
+        return $this;
+    }
+    
+    /**
+     * Set multiple selection field. Chained select won't work.
+     * @return RBO_Field_CommonData
+     */
+    public function set_multiple() {
+        $this->multiple = true;
         return $this;
     }
 
     /**
-     * Set chained select on this field
+     * Set chained select on this field. Chained select won't work on
+     * multiple selection.
      * @param RBO_FieldDefinition $field chained select field
      * @param RBO_FieldDefinition $_ several fields may be supplied
      * @return RBO_Field_CommonData
@@ -309,14 +333,21 @@ class RBO_Field_CommonData extends RBO_FieldDefinition {
     private function _fill_param() {
         if (!is_string($this->commondata_array_name))
             trigger_error("Commondata array name in field {$this->name} must be set!");
-        $param = array($this->commondata_array_name);
-        foreach ($this->chained_select_fields as $field) {
-            if (!is_a($field, 'RBO_FieldDefinition'))
-                trigger_error('Chained select param is not subclass of RBO_FieldDefinition', E_USER_ERROR);
-            $param[] = $field->name;
+        if ($this->multiple) {
+            $this->type = 'multiselect';
+            $param = Utils_RecordBrowserCommon::multiselect_from_common($this->commondata_array_name);
+            if ($this->order_by_key)
+                $param .= '::key';
+        } else {
+            $param = array($this->commondata_array_name);
+            foreach ($this->chained_select_fields as $field) {
+                if (!is_a($field, 'RBO_FieldDefinition'))
+                    trigger_error('Chained select param is not subclass of RBO_FieldDefinition', E_USER_ERROR);
+                $param[] = $field->name;
+            }
+            if ($this->order_by_key)
+                $param['order_by_key'] = true;
         }
-        if ($this->order_by_key)
-            $param['order_by_key'] = true;
         $this->param = $param;
     }
 
@@ -344,4 +375,51 @@ class RBO_Field_PageSplit extends RBO_FieldDefinition {
     }
 }
 
+
+/**
+ * @author Adam Bukowski <abukowski@telaxus.com>
+ */
+class RBO_Field_Autonumber extends RBO_FieldDefinition {
+    
+    private $prefix;
+    private $pad_length;
+    private $pad_mask;
+    
+    public function __construct($display_name, $prefix = '#', $pad_length = 6, $pad_mask = '0') {
+        parent::__construct($display_name, 'autonumber');
+        $this->set_prefix($prefix);
+        $this->set_pad_length($pad_length);
+        $this->set_pad_mask($pad_mask);
+    }
+    
+    public function get_definition() {
+        $this->param = self::format_param($this->prefix, $this->pad_length, $this->pad_mask);
+        return parent::get_definition();
+    }
+    
+    public function set_prefix($char) {
+        $this->prefix = $char;
+        return $this;
+    }
+    
+    public function set_pad_length($pad_length) {
+        $this->pad_length = $pad_length;
+        return $this;
+    }
+    
+    public function set_pad_mask($char) {
+        $this->pad_mask = $char;
+        return $this;
+    }
+        
+    private static function format_param($prefix = '#', $pad_length = 6, $pad_mask = '0') {
+        if (!is_int($pad_length))
+            trigger_error('pad_length is not integer');
+        if ($pad_mask == ',')
+            trigger_error('pad_mask cannot be comma');
+        if ($prefix == ',')
+            trigger_error('prefix cannot be comma');
+        return Utils_RecordBrowserCommon::encode_autonumber_param($prefix, $pad_length, $pad_mask);
+    }    
+}
 ?>

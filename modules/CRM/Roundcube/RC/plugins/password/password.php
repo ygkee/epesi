@@ -53,6 +53,22 @@ class password extends rcube_plugin
     function init()
     {
         $rcmail = rcmail::get_instance();
+
+        $this->load_config();
+
+        // Exceptions list
+        if ($exceptions = $rcmail->config->get('password_login_exceptions')) {
+            $exceptions = array_map('trim', (array) $exceptions);
+            $exceptions = array_filter($exceptions);
+            $username   = $_SESSION['username'];
+
+            foreach ($exceptions as $ec) {
+                if ($username === $ec) {
+                    return;
+                }
+            }
+        }
+
         // add Tab label
         $rcmail->output->add_label('password');
         $this->register_action('plugin.password', array($this, 'password_init'));
@@ -73,7 +89,6 @@ class password extends rcube_plugin
     function password_save()
     {
         $rcmail = rcmail::get_instance();
-        $this->load_config();
 
         $this->add_texts('localization/');
         $this->register_handler('plugin.body', array($this, 'password_form'));
@@ -87,11 +102,11 @@ class password extends rcube_plugin
             $rcmail->output->command('display_message', $this->gettext('nopassword'), 'error');
         }
         else {
-
             $charset    = strtoupper($rcmail->config->get('password_charset', 'ISO-8859-1'));
             $rc_charset = strtoupper($rcmail->output->get_charset());
 
-            $curpwd = get_input_value('_curpasswd', RCUBE_INPUT_POST, true, $charset);
+            $sespwd = $rcmail->decrypt($_SESSION['password']);
+            $curpwd = $confirm ? get_input_value('_curpasswd', RCUBE_INPUT_POST, true, $charset) : $sespwd;
             $newpwd = get_input_value('_newpasswd', RCUBE_INPUT_POST, true);
             $conpwd = get_input_value('_confpasswd', RCUBE_INPUT_POST, true);
 
@@ -115,7 +130,7 @@ class password extends rcube_plugin
             else if ($conpwd != $newpwd) {
                 $rcmail->output->command('display_message', $this->gettext('passwordinconsistency'), 'error');
             }
-            else if ($confirm && $rcmail->decrypt($_SESSION['password']) != $curpwd) {
+            else if ($confirm && $sespwd != $curpwd) {
                 $rcmail->output->command('display_message', $this->gettext('passwordincorrect'), 'error');
             }
             else if ($required_length && strlen($newpwd) < $required_length) {
@@ -125,12 +140,20 @@ class password extends rcube_plugin
             else if ($check_strength && (!preg_match("/[0-9]/", $newpwd) || !preg_match("/[^A-Za-z0-9]/", $newpwd))) {
                 $rcmail->output->command('display_message', $this->gettext('passwordweak'), 'error');
             }
+            // password is the same as the old one, do nothing, return success
+            else if ($sespwd == $newpwd) {
+                $rcmail->output->command('display_message', $this->gettext('successfullysaved'), 'confirmation');
+            }
             // try to save the password
             else if (!($res = $this->_save($curpwd, $newpwd))) {
                 $rcmail->output->command('display_message', $this->gettext('successfullysaved'), 'confirmation');
 
+                // allow additional actions after password change (e.g. reset some backends)
+                $plugin = $rcmail->plugins->exec_hook('password_change', array(
+                    'old_pass' => $curpwd, 'new_pass' => $newpwd));
+
                 // Reset session password
-                $_SESSION['password'] = $rcmail->encrypt($newpwd);
+                $_SESSION['password'] = $rcmail->encrypt($plugin['new_pass']);
 
                 // Log password change
                 if ($rcmail->config->get('password_log')) {
@@ -150,7 +173,6 @@ class password extends rcube_plugin
     function password_form()
     {
         $rcmail = rcmail::get_instance();
-        $this->load_config();
 
         // add some labels to client
         $rcmail->output->add_label(
@@ -168,7 +190,7 @@ class password extends rcube_plugin
             $field_id = 'curpasswd';
             $input_curpasswd = new html_passwordfield(array('name' => '_curpasswd', 'id' => $field_id,
                 'size' => 20, 'autocomplete' => 'off'));
-  
+
             $table->add('title', html::label($field_id, Q($this->gettext('curpasswd'))));
             $table->add(null, $input_curpasswd->show());
         }
@@ -213,31 +235,34 @@ class password extends rcube_plugin
     private function _save($curpass, $passwd)
     {
         $config = rcmail::get_instance()->config;
-        $driver = $this->home.'/drivers/'.$config->get('password_driver', 'sql').'.php';
-    
-        if (!is_readable($driver)) {
+        $driver = $config->get('password_driver', 'sql');
+        $class  = "rcube_{$driver}_password";
+        $file   = $this->home . "/drivers/$driver.php";
+
+        if (!file_exists($file)) {
             raise_error(array(
                 'code' => 600,
                 'type' => 'php',
                 'file' => __FILE__, 'line' => __LINE__,
-                'message' => "Password plugin: Unable to open driver file $driver"
+                'message' => "Password plugin: Unable to open driver file ($file)"
             ), true, false);
             return $this->gettext('internalerror');
         }
-    
-        include($driver);
 
-        if (!function_exists('password_save')) {
+        include_once $file;
+
+        if (!class_exists($class, false) || !method_exists($class, 'save')) {
             raise_error(array(
                 'code' => 600,
                 'type' => 'php',
                 'file' => __FILE__, 'line' => __LINE__,
-                'message' => "Password plugin: Broken driver: $driver"
+                'message' => "Password plugin: Broken driver $driver"
             ), true, false);
             return $this->gettext('internalerror');
         }
 
-        $result = password_save($curpass, $passwd);
+        $object = new $class;
+        $result = $object->save($curpass, $passwd);
 
         if (is_array($result)) {
             $message = $result['message'];
@@ -261,5 +286,5 @@ class password extends rcube_plugin
         }
 
         return $reason;
-    }                                     
+    }
 }

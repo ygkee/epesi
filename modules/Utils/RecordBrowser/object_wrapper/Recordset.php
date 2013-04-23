@@ -55,7 +55,11 @@ abstract class RBO_Recordset {
     ///////////// magic QFfield and display callbacks //////////////
 
     public function refresh_magic_callbacks() {
+        /** @var $field RBO_FieldDefinition */
         foreach ($this->fields() as $field) {
+            if (!$field->magic_callbacks())
+                continue;
+
             $field_id = Utils_RecordBrowserCommon::get_field_id($field->name);
 
             if (!$field->QFfield_callback) {
@@ -318,6 +322,10 @@ abstract class RBO_Recordset {
         }
 
         Utils_RecordBrowserCommon::new_record_field($this->tab, $definition);
+    }
+    
+    public function delete_record_field($field_name) {
+        Utils_RecordBrowserCommon::delete_record_field($this->tab, $field_name);
     }
 
     /**

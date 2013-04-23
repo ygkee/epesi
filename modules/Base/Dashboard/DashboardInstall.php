@@ -79,6 +79,8 @@ class Base_DashboardInstall extends ModuleInstall {
 		Base_ThemeCommon::install_default_theme($this->get_type());
 
 		Base_AclCommon::add_permission(_M('Dashboard'),array('ACCESS:employee'));
+		Base_HomePageCommon::set_home_page(_M('Dashboard'),array('ACCESS:employee'));
+		Base_HomePageCommon::set_home_page(_M('My Contact'),array()); // Not exactly the place to add that, but we need to ensure proper order of home pages
 
 		return $ret;
 	}
@@ -103,6 +105,7 @@ class Base_DashboardInstall extends ModuleInstall {
 		return array(
 			array('name'=>'Base/ActionBar','version'=>0),
 			array('name'=>'Base/Theme','version'=>0),
+			array('name'=>'Base/HomePage','version'=>0),
 			array('name'=>'Base/User','version'=>0),
 			array('name'=>'Base/User/Settings','version'=>0),
 			array('name'=>'Libs/QuickForm','version'=>0),

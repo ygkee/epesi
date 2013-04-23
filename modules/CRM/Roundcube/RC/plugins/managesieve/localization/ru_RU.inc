@@ -1,22 +1,19 @@
 <?php
+
 /*
-
-+-----------------------------------------------------------------------+
-| plugins/managesieve/localization/ru_RU.inc                            |
-|                                                                       |
-| Russian translation for roundcube/managesieve plugin                  |
-| Copyright (C) 2008-2010                                               |
-| Licensed under the GNU GPL                                            |
-|                                                                       |
-+-----------------------------------------------------------------------+
-| Author:                                                               |
-| Updates: Sergey Dukachev <iam@dukess.ru>                              |
-+-----------------------------------------------------------------------+
-
-@version 2010-10-11
-
+ +-----------------------------------------------------------------------+
+ | localization/ru_RU/labels.inc                                         |
+ |                                                                       |
+ | Language file of the Roundcube Webmail client                         |
+ | Copyright (C) 2012, The Roundcube Dev Team                            |
+ | Licensed under the GNU General Public License                         |
+ |                                                                       |
+ +-----------------------------------------------------------------------+
+ | Author: Vyacheslav Sharmanov                                          |
+ +-----------------------------------------------------------------------+
 */
 
+$labels = array();
 $labels['filters'] = 'Фильтры';
 $labels['managefilters'] = 'Управление фильтрами для входящей почты';
 $labels['filtername'] = 'Название фильтра';
@@ -34,8 +31,12 @@ $labels['filteris'] = 'соответствует';
 $labels['filterisnot'] = 'не соответствует';
 $labels['filterexists'] = 'существует';
 $labels['filternotexists'] = 'не существует';
-$labels['filterunder'] = 'под';
-$labels['filterover'] = 'на';
+$labels['filtermatches'] = 'совпадает с выражением';
+$labels['filternotmatches'] = 'не совпадает с выражением';
+$labels['filterregex'] = 'совпадает с регулярным выражением';
+$labels['filternotregex'] = 'не совпадает с регулярным выражением';
+$labels['filterunder'] = 'меньше';
+$labels['filterover'] = 'больше';
 $labels['addrule'] = 'Добавить правило';
 $labels['delrule'] = 'Удалить правило';
 $labels['messagemoveto'] = 'Переместить сообщение в';
@@ -51,21 +52,23 @@ $labels['add'] = 'Добавить';
 $labels['del'] = 'Удалить';
 $labels['sender'] = 'Отправитель';
 $labels['recipient'] = 'Получатель';
-$labels['vacationaddresses'] = 'Список дополнительных адресов получателя (разделённых запятыми):';
+$labels['vacationaddresses'] = 'Список моих дополнительных адресов (разделённых запятыми):';
 $labels['vacationdays'] = 'Как часто отправлять сообщения (в днях):';
 $labels['vacationreason'] = 'Текст сообщения (причина отсутствия):';
+$labels['vacationsubject'] = 'Тема сообщения:';
 $labels['rulestop'] = 'Закончить выполнение';
+$labels['enable'] = 'Включить/Выключить';
 $labels['filterset'] = 'Набор фильтров';
+$labels['filtersets'] = 'Наборы фильтров';
 $labels['filtersetadd'] = 'Добавить набор фильтров';
 $labels['filtersetdel'] = 'Удалить текущий набор фильтров';
 $labels['filtersetact'] = 'Включить текущий набор фильтров';
 $labels['filtersetdeact'] = 'Отключить текущий набор фильтров';
-$labels['filtersetget'] = 'Скачать набор фильтров в виде текста';
 $labels['filterdef'] = 'Описание фильтра';
 $labels['filtersetname'] = 'Название набора фильтров';
 $labels['newfilterset'] = 'Новый набор фильтров';
 $labels['active'] = 'используется';
-$labels['none'] = 'пустой';
+$labels['none'] = 'нет';
 $labels['fromset'] = 'из набора';
 $labels['fromfile'] = 'из файла';
 $labels['filterdisabled'] = 'Отключить фильтр';
@@ -76,46 +79,71 @@ $labels['countislessthanequal'] = 'количество меньше или ра
 $labels['countequals'] = 'количество равно';
 $labels['countnotequals'] = 'количество не равно';
 $labels['valueisgreaterthan'] = 'значение больше, чем';
-$labels['countisgreaterthan'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ Ð±ÐŸÐ»ÑÑÐµ, ÑÐµÐŒ';
-$labels['countisgreaterthanequal'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ Ð±ÐŸÐ»ÑÑÐµ ÐžÐ»Ðž ÑÐ°Ð²ÐœÐŸ';
-$labels['countislessthan'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ ÐŒÐµÐœÑÑÐµ, ÑÐµÐŒ';
-$labels['countislessthanequal'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ ÐŒÐµÐœÑÑÐµ ÐžÐ»Ðž ÑÐ°Ð²ÐœÐŸ';
-$labels['countequals'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ ÑÐ°Ð²ÐœÐŸ';
-$labels['countnotequals'] = 'ÐºÐŸÐ»ÐžÑÐµÑÑÐ²ÐŸ ÐœÐµ ÑÐ°Ð²ÐœÐŸ';
-$labels['valueisgreaterthan'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ Ð±ÐŸÐ»ÑÑÐµ, ÑÐµÐŒ';
-$labels['valueisgreaterthanequal'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ Ð±ÐŸÐ»ÑÑÐµ ÐžÐ»Ðž ÑÐ°Ð²ÐœÐŸ';
-$labels['valueislessthan'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ ÐŒÐµÐœÑÑÐµ, ÑÐµÐŒ';
-$labels['valueislessthanequal'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ ÐŒÐµÐœÑÑÐµ ÐžÐ»Ðž ÑÐ°Ð²ÐœÐŸ';
-$labels['valueequals'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ ÑÐ°Ð²ÐœÐŸ';
-$labels['valuenotequals'] = 'Ð·ÐœÐ°ÑÐµÐœÐžÐµ ÐœÐµ ÑÐ°Ð²ÐœÐŸ';
 $labels['valueisgreaterthanequal'] = 'значение больше или равно';
 $labels['valueislessthan'] = 'значение меньше, чем';
 $labels['valueislessthanequal'] = 'значение меньше или равно';
 $labels['valueequals'] = 'значение равно';
 $labels['valuenotequals'] = 'значение не равно';
+$labels['setflags'] = 'Установить флаги на сообщение';
+$labels['addflags'] = 'Добавить флаги к сообщению';
+$labels['removeflags'] = 'Убрать флаги из сообщения';
+$labels['flagread'] = 'Прочитано';
+$labels['flagdeleted'] = 'Удалено';
+$labels['flaganswered'] = 'Отвечено';
+$labels['flagflagged'] = 'Помечено';
+$labels['flagdraft'] = 'Черновик';
+$labels['filtercreate'] = 'Создать фильтр';
+$labels['usedata'] = 'Использовать следующие данные в фильтре:';
+$labels['nextstep'] = 'Далее';
+$labels['...'] = '...';
+$labels['advancedopts'] = 'Дополнительные параметры';
+$labels['body'] = 'Тело письма';
+$labels['address'] = 'адрес';
+$labels['envelope'] = 'конверт';
+$labels['modifier'] = 'модификатор области поиска:';
+$labels['text'] = 'текст';
+$labels['undecoded'] = 'необработанный (сырой)';
+$labels['contenttype'] = 'тип содержимого';
+$labels['modtype'] = 'поиск в адресах:';
+$labels['allparts'] = 'везде';
+$labels['domain'] = 'в имени домена';
+$labels['localpart'] = 'только в имени пользователя, без домена';
+$labels['user'] = 'в полном имени пользователя';
+$labels['detail'] = 'в дополнительных сведениях';
+$labels['comparator'] = 'способ сравнения:';
+$labels['default'] = 'по умолчанию';
+$labels['octet'] = 'Строгий (octet)';
+$labels['asciicasemap'] = 'Регистронезависимый (ascii-casemap)';
+$labels['asciinumeric'] = 'Числовой (ascii-numeric)';
+$labels['filterunknownerror'] = 'Неизвестная ошибка сервера';
+$labels['filterconnerror'] = 'Невозможно подсоединится к серверу фильтров';
+$labels['filterdeleteerror'] = 'Невозможно удалить фильтр. Ошибка сервера.';
+$labels['filterdeleted'] = 'Фильтр успешно удалён.';
+$labels['filtersaved'] = 'Фильтр успешно сохранён.';
+$labels['filtersaveerror'] = 'Невозможно сохранить фильтр. Ошибка сервера.';
+$labels['filterdeleteconfirm'] = 'Вы действительно хотите удалить фильтр?';
+$labels['ruledeleteconfirm'] = 'Вы уверенны, что хотите удалить это правило?';
+$labels['actiondeleteconfirm'] = 'Вы уверенны, что хотите удалить это действие?';
+$labels['forbiddenchars'] = 'Недопустимые символы в поле.';
+$labels['cannotbeempty'] = 'Поле не может быть пустым.';
+$labels['ruleexist'] = 'Фильтр с таким именем уже существует.';
+$labels['setactivateerror'] = 'Невозможно включить выбранный набор фильтров. Ошибка сервера.';
+$labels['setdeactivateerror'] = 'Невозможно отключить выбранный набор фильтров. Ошибка сервера.';
+$labels['setdeleteerror'] = 'Невозможно удалить выбранный набор фильтров. Ошибка сервера.';
+$labels['setactivated'] = 'Набор фильтров успешно включён.';
+$labels['setdeactivated'] = 'Набор фильтров успешно отключён.';
+$labels['setdeleted'] = 'Набор фильтров успешно удалён.';
+$labels['setdeleteconfirm'] = 'Вы уверены в том, что хотите удалить выбранный набор фильтров?';
+$labels['setcreateerror'] = 'Невозможно создать набор фильтров. Ошибка сервера.';
+$labels['setcreated'] = 'Набор фильтров успешно создан.';
+$labels['activateerror'] = 'Невозможно включить выбранный(е) фильтр(ы). Ошибка сервера.';
+$labels['deactivateerror'] = 'Невозможно выключить выбранный(е) фильтр(ы). Ошибка сервера.';
+$labels['activated'] = 'Фильтр(ы) успешно отключен(ы).';
+$labels['deactivated'] = 'Фильтр(ы) успешно включен(ы).';
+$labels['moved'] = 'Фильтр успешно перемещён.';
+$labels['moveerror'] = 'Невозможно переместить фильтр. Ошибка сервера.';
+$labels['nametoolong'] = 'Невозможно создать набор фильтров. Название слишком длинное.';
+$labels['namereserved'] = 'Зарезервированное имя.';
+$labels['setexist'] = 'Набор уже существует.';
+$labels['nodata'] = 'Нужно выбрать хотя бы одну позицию!';
 
-$messages = array();
-$messages['filterunknownerror'] = 'Неизвестная ошибка сервера';
-$messages['filterconnerror'] = 'Невозможно подсоединится к серверу фильтров';
-$messages['filterdeleteerror'] = 'Невозможно удалить фильтр. Ошибка сервера';
-$messages['filterdeleted'] = 'Фильтр успешно удалён';
-$messages['filterdeleteconfirm'] = 'Вы действительно хотите удалить фильтр?';
-$messages['filtersaved'] = 'Фильтр успешно сохранён';
-$messages['filtersaveerror'] = 'Невозможно сохранить фильтр. Ошибка сервера';
-$messages['ruledeleteconfirm'] = 'Вы уверенны, что хотите удалить это правило?';
-$messages['actiondeleteconfirm'] = 'Вы уверенны, что хотите удалить это действие?';
-$messages['forbiddenchars'] = 'Недопустимые символы в поле';
-$messages['cannotbeempty'] = 'Поле не может быть пустым';
-$messages['setactivateerror'] = 'Невозможно включить выбранный набор фильтров. Ошибка сервера';
-$messages['setdeactivateerror'] = 'Невозможно отключить выбранный набор фильтров. Ошибка сервера';
-$messages['setdeleteerror'] = 'Невозможно удалить выбранный набор фильтров. Ошибка сервера';
-$messages['setactivated'] = 'Набор фильтров успешно включён';
-$messages['setdeactivated'] = 'Набор фильтров успешно отключён';
-$messages['setdeleted'] = 'Набор фильтров успешно удалён';
-$messages['setdeleteconfirm'] = 'Вы уверены в том, что хотите удалить выбранный набор фильтров?';
-$messages['setcreateerror'] = 'Невозможно создать набор фильтров. Ошибка сервера';
-$messages['setcreated'] = 'Набор фильтров успешно создан';
-$messages['emptyname'] = 'Невозможно создать набор фильтров. Название не задано';
-$messages['nametoolong'] = 'Невозможно создать набор фильтров. Название слишком длинное'
-
-?>

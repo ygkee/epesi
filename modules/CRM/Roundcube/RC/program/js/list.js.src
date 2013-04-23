@@ -3,8 +3,11 @@
  | Roundcube List Widget                                                 |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2006-2009, Roundcube Dev, - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2006-2009, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  +-----------------------------------------------------------------------+
  | Authors: Thomas Bruederli <roundcube@gmail.com>                       |
@@ -13,7 +16,7 @@
  | Requires: common.js                                                   |
  +-----------------------------------------------------------------------+
 
-  $Id: list.js 4666 2011-04-17 09:34:02Z alec $
+  $Id$
 */
 
 
@@ -36,7 +39,7 @@ function rcube_list_widget(list, p)
   this.colcount = 0;
 
   this.subject_col = -1;
-  this.shiftkey = false;
+  this.modkey = 0;
   this.multiselect = false;
   this.multiexpand = false;
   this.multi_selecting = false;
@@ -58,7 +61,7 @@ function rcube_list_widget(list, p)
   this.row_init = function(){};
 
   // overwrite default paramaters
-  if (p && typeof(p) == 'object')
+  if (p && typeof p === 'object')
     for (var n in p)
       this[n] = p[n];
 };
@@ -101,7 +104,7 @@ init: function()
 init_row: function(row)
 {
   // make references in internal array and set event handlers
-  if (row && String(row.id).match(/rcmrow([a-z0-9\-_=\+\/]+)/i)) {
+  if (row && String(row.id).match(/^rcmrow([a-z0-9\-_=\+\/]+)/i)) {
     var self = this,
       uid = RegExp.$1;
     row.uid = uid;
@@ -182,8 +185,12 @@ clear: function(sel)
  */
 remove_row: function(uid, sel_next)
 {
-  if (this.rows[uid].obj)
-    this.rows[uid].obj.style.display = 'none';
+  var obj = this.rows[uid] ? this.rows[uid].obj : null;
+
+  if (!obj)
+    return;
+
+  obj.style.display = 'none';
 
   if (sel_next)
     this.select_next();
@@ -226,8 +233,8 @@ focus: function(e)
     }
   }
 
-  // Un-focus already focused elements
-  $('*:focus', window).blur();
+  // Un-focus already focused elements (#1487123, #1487316, #1488600, #1488620)
+  $(':focus:not(body)').blur();
   $('iframe').each(function() { this.blur(); });
 
   if (e || (e = window.event))
@@ -245,7 +252,7 @@ blur: function()
   for (n in this.selection) {
     id = this.selection[n];
     if (this.rows[id] && this.rows[id].obj) {
-      $(this.rows[id].obj).removeClass('selected').addClass('unfocused');
+      $(this.rows[id].obj).removeClass('selected focused').addClass('unfocused');
     }
   }
 },
@@ -350,8 +357,10 @@ click_row: function(e, id)
   this.in_selection_before = false;
 
   // row was double clicked
-  if (this.rows && dblclicked && this.in_selection(id))
+  if (this.rows && dblclicked && this.in_selection(id)) {
     this.triggerEvent('dblclick');
+    now = 0;
+  }
   else
     this.triggerEvent('click');
 
@@ -410,7 +419,7 @@ expand_row: function(e, id)
 collapse: function(row)
 {
   row.expanded = false;
-  this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded });
+  this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded, obj:row.obj });
   var depth = row.depth;
   var new_row = row ? row.obj.nextSibling : null;
   var r;
@@ -423,7 +432,7 @@ collapse: function(row)
       $(new_row).css('display', 'none');
       if (r.expanded) {
         r.expanded = false;
-        this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded });
+        this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded, obj:new_row });
       }
     }
     new_row = new_row.nextSibling;
@@ -441,7 +450,7 @@ expand: function(row)
     depth = row.depth;
     new_row = row.obj.nextSibling;
     this.update_expando(row.uid, true);
-    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded });
+    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded, obj:row.obj });
   }
   else {
     var tbody = this.list.tBodies[0];
@@ -464,7 +473,7 @@ expand: function(row)
               last_expanded_parent_depth = p.depth;
               $(new_row).css('display', '');
               r.expanded = true;
-              this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded });
+              this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded, obj:new_row });
             }
           }
           else
@@ -489,7 +498,7 @@ collapse_all: function(row)
     depth = row.depth;
     new_row = row.obj.nextSibling;
     this.update_expando(row.uid);
-    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded });
+    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded, obj:row.obj });
 
     // don't collapse sub-root tree in multiexpand mode 
     if (depth && this.multiexpand)
@@ -511,7 +520,7 @@ collapse_all: function(row)
         if (r.has_children && r.expanded) {
           r.expanded = false;
           this.update_expando(r.uid, false);
-          this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded });
+          this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded, obj:new_row });
         }
       }
     }
@@ -530,7 +539,7 @@ expand_all: function(row)
     depth = row.depth;
     new_row = row.obj.nextSibling;
     this.update_expando(row.uid, true);
-    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded });
+    this.triggerEvent('expandcollapse', { uid:row.uid, expanded:row.expanded, obj:row.obj });
   }
   else {
     new_row = this.list.tBodies[0].firstChild;
@@ -547,7 +556,7 @@ expand_all: function(row)
         if (r.has_children && !r.expanded) {
           r.expanded = true;
           this.update_expando(r.uid, true);
-          this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded });
+          this.triggerEvent('expandcollapse', { uid:r.uid, expanded:r.expanded, obj:new_row });
         }
       }
     }
@@ -601,8 +610,8 @@ get_first_row: function()
     var i, len, rows = this.list.tBodies[0].rows;
 
     for (i=0, len=rows.length-1; i<len; i++)
-      if (rows[i].id && String(rows[i].id).match(/rcmrow([a-z0-9\-_=\+\/]+)/i) && this.rows[RegExp.$1] != null)
-	    return RegExp.$1;
+      if (rows[i].id && String(rows[i].id).match(/^rcmrow([a-z0-9\-_=\+\/]+)/i) && this.rows[RegExp.$1] != null)
+        return RegExp.$1;
   }
 
   return null;
@@ -614,7 +623,7 @@ get_last_row: function()
     var i, rows = this.list.tBodies[0].rows;
 
     for (i=rows.length-1; i>=0; i--)
-      if (rows[i].id && String(rows[i].id).match(/rcmrow([a-z0-9\-_=\+\/]+)/i) && this.rows[RegExp.$1] != null)
+      if (rows[i].id && String(rows[i].id).match(/^rcmrow([a-z0-9\-_=\+\/]+)/i) && this.rows[RegExp.$1] != null)
         return RegExp.$1;
   }
 
@@ -648,7 +657,7 @@ select_row: function(id, mod_key, with_mouse)
       case CONTROL_KEY:
         if (!with_mouse)
           this.highlight_row(id, true);
-        break; 
+        break;
 
       case CONTROL_SHIFT_KEY:
         this.shift_select(id, true);
@@ -954,7 +963,8 @@ highlight_row: function(id, multiple)
  */
 key_press: function(e)
 {
-  if (this.focused != true)
+  var target = e.target || {};
+  if (this.focused != true || target.nodeName == 'INPUT' || target.nodeName == 'TEXTAREA' || target.nodeName == 'SELECT')
     return true;
 
   var keyCode = rcube_event.get_keycode(e),
@@ -962,7 +972,7 @@ key_press: function(e)
 
   switch (keyCode) {
     case 40:
-    case 38: 
+    case 38:
     case 63233: // "down", in safari keypress
     case 63232: // "up", in safari keypress
       // Stop propagation so that the browser doesn't scroll
@@ -976,7 +986,9 @@ key_press: function(e)
       rcube_event.cancel(e);
       var ret = this.use_plusminus_key(keyCode, mod_key);
       this.key_pressed = keyCode;
+      this.modkey = mod_key;
       this.triggerEvent('keypress');
+      this.modkey = 0;
       return ret;
     case 36: // Home
       this.select_first(mod_key);
@@ -985,9 +997,10 @@ key_press: function(e)
       this.select_last(mod_key);
       return rcube_event.cancel(e);
     default:
-      this.shiftkey = e.shiftKey;
       this.key_pressed = keyCode;
+      this.modkey = mod_key;
       this.triggerEvent('keypress');
+      this.modkey = 0;
 
       if (this.key_pressed == this.BACKSPACE_KEY)
         return rcube_event.cancel(e);
@@ -1001,13 +1014,17 @@ key_press: function(e)
  */
 key_down: function(e)
 {
+  var target = e.target || {};
+  if (this.focused != true || target.nodeName == 'INPUT' || target.nodeName == 'TEXTAREA' || target.nodeName == 'SELECT')
+    return true;
+  
   switch (rcube_event.get_keycode(e)) {
     case 27:
       if (this.drag_active)
-	    return this.drag_mouse_up(e);
+      return this.drag_mouse_up(e);
       if (this.col_drag_active) {
         this.selected_column = null;
-	    return this.column_drag_mouse_up(e);
+        return this.column_drag_mouse_up(e);
       }
 
     case 40:
@@ -1042,7 +1059,7 @@ use_arrow_key: function(keyCode, mod_key)
     new_row = this.get_prev_row();
 
   if (new_row) {
-    this.select_row(new_row.uid, mod_key, true);
+    this.select_row(new_row.uid, mod_key, false);
     this.scrollto(new_row.uid);
   }
 

@@ -48,7 +48,7 @@
  * @author    Aleksander Machniak <alec@php.net>
  * @copyright 2003-2006 PEAR <pear-group@php.net>
  * @license   http://www.opensource.org/licenses/bsd-license.php BSD License
- * @version   CVS: $Id: mimePart.php 4295 2010-12-01 10:49:20Z alec $
+ * @version   1.8.5
  * @link      http://pear.php.net/package/Mail_mime
  */
 
@@ -70,7 +70,7 @@
  * @author    Aleksander Machniak <alec@php.net>
  * @copyright 2003-2006 PEAR <pear-group@php.net>
  * @license   http://www.opensource.org/licenses/bsd-license.php BSD License
- * @version   Release: @package_version@
+ * @version   Release: 1.8.5
  * @link      http://pear.php.net/package/Mail_mime
  */
 class Mail_mimePart
@@ -131,6 +131,7 @@ class Mail_mimePart
     */
     var $_eol = "\r\n";
 
+
     /**
     * Constructor.
     *
@@ -144,7 +145,7 @@ class Mail_mimePart
     *     charset           - Content character set
     *     cid               - Content ID to apply
     *     disposition       - Content disposition, inline or attachment
-    *     dfilename         - Filename parameter for content disposition
+    *     filename          - Filename parameter for content disposition
     *     description       - Content description
     *     name_encoding     - Encoding of the attachment name (Content-Type)
     *                         By default filenames are encoded using RFC2231
@@ -155,6 +156,8 @@ class Mail_mimePart
     *     headers_charset   - Charset of the headers e.g. filename, description.
     *                         If not set, 'charset' will be used
     *     eol               - End of line sequence. Default: "\r\n"
+    *     headers           - Hash array with additional part headers. Array keys can be
+    *                         in form of <header_name>:<parameter_name>
     *     body_file         - Location of file with part's body (instead of $body)
     *
     * @access public
@@ -165,6 +168,11 @@ class Mail_mimePart
             $this->_eol = $params['eol'];
         } else if (defined('MAIL_MIMEPART_CRLF')) { // backward-copat.
             $this->_eol = MAIL_MIMEPART_CRLF;
+        }
+
+        // Additional part headers
+        if (!empty($params['headers']) && is_array($params['headers'])) {
+            $headers = $params['headers'];
         }
 
         foreach ($params as $key => $value) {
@@ -184,6 +192,11 @@ class Mail_mimePart
 
             case 'body_file':
                 $this->_body_file = $value;
+                break;
+
+            // for backward compatibility
+            case 'dfilename':
+                $params['filename'] = $value;
                 break;
             }
         }
@@ -210,13 +223,17 @@ class Mail_mimePart
                 $params['headers_charset'] = $params['charset'];
             }
         }
+
+        // header values encoding parameters
+        $h_charset  = !empty($params['headers_charset']) ? $params['headers_charset'] : 'US-ASCII';
+        $h_language = !empty($params['language']) ? $params['language'] : null;
+        $h_encoding = !empty($params['name_encoding']) ? $params['name_encoding'] : null;
+
+
         if (!empty($params['filename'])) {
             $headers['Content-Type'] .= ';' . $this->_eol;
             $headers['Content-Type'] .= $this->_buildHeaderParam(
-                'name', $params['filename'],
-                !empty($params['headers_charset']) ? $params['headers_charset'] : 'US-ASCII',
-                !empty($params['language']) ? $params['language'] : null,
-                !empty($params['name_encoding']) ? $params['name_encoding'] : null
+                'name', $params['filename'], $h_charset, $h_language, $h_encoding
             );
         }
 
@@ -226,21 +243,39 @@ class Mail_mimePart
             if (!empty($params['filename'])) {
                 $headers['Content-Disposition'] .= ';' . $this->_eol;
                 $headers['Content-Disposition'] .= $this->_buildHeaderParam(
-                    'filename', $params['filename'],
-                    !empty($params['headers_charset']) ? $params['headers_charset'] : 'US-ASCII',
-                    !empty($params['language']) ? $params['language'] : null,
+                    'filename', $params['filename'], $h_charset, $h_language,
                     !empty($params['filename_encoding']) ? $params['filename_encoding'] : null
                 );
+            }
+
+            // add attachment size
+            $size = $this->_body_file ? filesize($this->_body_file) : strlen($body);
+            if ($size) {
+                $headers['Content-Disposition'] .= ';' . $this->_eol . ' size=' . $size;
             }
         }
 
         if (!empty($params['description'])) {
             $headers['Content-Description'] = $this->encodeHeader(
-                'Content-Description', $params['description'],
-                !empty($params['headers_charset']) ? $params['headers_charset'] : 'US-ASCII',
-                !empty($params['name_encoding']) ? $params['name_encoding'] : 'quoted-printable',
+                'Content-Description', $params['description'], $h_charset, $h_encoding,
                 $this->_eol
             );
+        }
+
+        // Search and add existing headers' parameters
+        foreach ($headers as $key => $value) {
+            $items = explode(':', $key);
+            if (count($items) == 2) {
+                $header = $items[0];
+                $param  = $items[1];
+                if (isset($headers[$header])) {
+                    $headers[$header] .= ';' . $this->_eol;
+                }
+                $headers[$header] .= $this->_buildHeaderParam(
+                    $param, $value, $h_charset, $h_language, $h_encoding
+                );
+                unset($headers[$key]);
+            }
         }
 
         // Default encoding
@@ -633,8 +668,8 @@ class Mail_mimePart
         // RFC 2045:
         // value needs encoding if contains non-ASCII chars or is longer than 78 chars
         if (!preg_match('#[^\x20-\x7E]#', $value)) {
-            $token_regexp = '#([^\x21,\x23-\x27,\x2A,\x2B,\x2D'
-                . ',\x2E,\x30-\x39,\x41-\x5A,\x5E-\x7E])#';
+            $token_regexp = '#([^\x21\x23-\x27\x2A\x2B\x2D'
+                . '\x2E\x30-\x39\x41-\x5A\x5E-\x7E])#';
             if (!preg_match($token_regexp, $value)) {
                 // token
                 if (strlen($name) + strlen($value) + 3 <= $maxLength) {
@@ -656,7 +691,7 @@ class Mail_mimePart
 
         // RFC2231:
         $encValue = preg_replace_callback(
-            '/([^\x21,\x23,\x24,\x26,\x2B,\x2D,\x2E,\x30-\x39,\x41-\x5A,\x5E-\x7E])/',
+            '/([^\x21\x23\x24\x26\x2B\x2D\x2E\x30-\x39\x41-\x5A\x5E-\x7E])/',
             array($this, '_encodeReplaceCallback'), $value
         );
         $value = "$charset'$language'$encValue";
@@ -800,6 +835,9 @@ class Mail_mimePart
 
         // Structured header (make sure addr-spec inside is not encoded)
         if (!empty($separator)) {
+            // Simple e-mail address regexp
+            $email_regexp = '([^\s<]+|("[^\r\n"]+"))@\S+';
+
             $parts = Mail_mimePart::_explodeQuotedString($separator, $value);
             $value = '';
 
@@ -817,12 +855,12 @@ class Mail_mimePart
                 }
 
                 // let's find phrase (name) and/or addr-spec
-                if (preg_match('/^<\S+@\S+>$/', $part)) {
+                if (preg_match('/^<' . $email_regexp . '>$/', $part)) {
                     $value .= $part;
-                } else if (preg_match('/^\S+@\S+$/', $part)) {
+                } else if (preg_match('/^' . $email_regexp . '$/', $part)) {
                     // address without brackets and without name
                     $value .= $part;
-                } else if (preg_match('/<*\S+@\S+>*$/', $part, $matches)) {
+                } else if (preg_match('/<*' . $email_regexp . '>*$/', $part, $matches)) {
                     // address with name (handle name)
                     $address = $matches[0];
                     $word = str_replace($address, '', $part);

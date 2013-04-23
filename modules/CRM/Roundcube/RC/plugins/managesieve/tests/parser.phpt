@@ -3,10 +3,10 @@ Main test of script parser
 --SKIPIF--
 --FILE--
 <?php
-include('../lib/rcube_sieve.php');
+include '../lib/rcube_sieve_script.php';
 
 $txt = '
-require ["fileinto","vacation","reject","relational","comparator-i;ascii-numeric"];
+require ["fileinto","reject","envelope"];
 # rule:[spam]
 if anyof (header :contains "X-DSPAM-Result" "Spam")
 {
@@ -14,26 +14,15 @@ if anyof (header :contains "X-DSPAM-Result" "Spam")
 	stop;
 }
 # rule:[test1]
-if anyof (header :contains ["From","To"] "test@domain.tld")
+if anyof (header :comparator "i;ascii-casemap" :contains ["From","To"] "test@domain.tld")
 {
 	discard;
 	stop;
 }
 # rule:[test2]
-if anyof (not header :contains ["Subject"] "[test]", header :contains "Subject" "[test2]")
+if anyof (not header :comparator "i;octet" :contains ["Subject"] "[test]", header :contains "Subject" "[test2]")
 {
 	fileinto "test";
-	stop;
-}
-# rule:[test-vacation]
-if anyof (header :contains "Subject" "vacation")
-{
-	vacation :days 1 text:
-# test
-test test /* test */
-test
-.
-;
 	stop;
 }
 # rule:[comments]
@@ -44,19 +33,40 @@ if anyof (true) /* comment
 }
 # rule:[reject]
 if size :over 5000K {
-    reject "Message over 5MB size limit. Please contact me before sending this.";
+	reject "Message over 5MB size limit. Please contact me before sending this.";
 }
-# rule:[redirect]
-if header :value "ge" :comparator "i;ascii-numeric"
-    ["X-Spam-score"] ["14"] {redirect "test@test.tld";}
+# rule:[false]
+if false # size :over 5000K
+{
+	stop; /* rule disabled */
+}
+# rule:[true]
+if true
+{
+	stop;
+}
+fileinto "Test";
+# rule:[address test]
+if address :all :is "From" "nagios@domain.tld"
+{
+	fileinto "domain.tld";
+	stop;
+}
+# rule:[envelope test]
+if envelope :domain :is "From" "domain.tld"
+{
+	fileinto "domain.tld";
+	stop;
+}
 ';
 
 $s = new rcube_sieve_script($txt);
 echo $s->as_text();
 
+// -------------------------------------------------------------------------------
 ?>
 --EXPECT--
-require ["fileinto","vacation","reject","relational","comparator-i;ascii-numeric"];
+require ["fileinto","reject","envelope"];
 # rule:[spam]
 if header :contains "X-DSPAM-Result" "Spam"
 {
@@ -70,20 +80,9 @@ if header :contains ["From","To"] "test@domain.tld"
 	stop;
 }
 # rule:[test2]
-if anyof (not header :contains "Subject" "[test]", header :contains "Subject" "[test2]")
+if anyof (not header :comparator "i;octet" :contains "Subject" "[test]", header :contains "Subject" "[test2]")
 {
 	fileinto "test";
-	stop;
-}
-# rule:[test-vacation]
-if header :contains "Subject" "vacation"
-{
-	vacation :days 1 text:
-# test
-test test /* test */
-test
-.
-;
 	stop;
 }
 # rule:[comments]
@@ -96,8 +95,26 @@ if size :over 5000K
 {
 	reject "Message over 5MB size limit. Please contact me before sending this.";
 }
-# rule:[redirect]
-if header :value "ge" :comparator "i;ascii-numeric" "X-Spam-score" "14"
+# rule:[false]
+if false # size :over 5000K
 {
-	redirect "test@test.tld";
+	stop;
+}
+# rule:[true]
+if true
+{
+	stop;
+}
+fileinto "Test";
+# rule:[address test]
+if address :all :is "From" "nagios@domain.tld"
+{
+	fileinto "domain.tld";
+	stop;
+}
+# rule:[envelope test]
+if envelope :domain :is "From" "domain.tld"
+{
+	fileinto "domain.tld";
+	stop;
 }

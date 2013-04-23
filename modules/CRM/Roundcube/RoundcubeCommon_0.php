@@ -157,6 +157,9 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
         $form->addElement('static', $field, $label,'<iframe id="rc_mail_body" src="modules/CRM/Roundcube/get_html.php?'.http_build_query(array('id'=>$rb->record['id'])).'" style="width:100%;border:0" border="0"></iframe>');
     }
 
+    public static function QFfield_hidden(&$form, $field, $label, $mode, $default, $desc, $rb=null) {
+    }
+
     public static function QFfield_attachments(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
 	if(isset($_GET['rc_reply']) && $_GET['rc_reply']==$rb_obj->record['id']) {
 		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array($rb_obj->record['from'],(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><stron>On '.Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'].' wrote:</strong><br/>'.$rb_obj->record['body']));
@@ -177,9 +180,9 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
 	} elseif(isset($_GET['rc_forward']) && $_GET['rc_forward']==$rb_obj->record['id']) {
 		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array('',(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><stron>On '.Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'].' wrote:</strong><br/>'.$rb_obj->record['body']));
 	}
-	Base_ActionBarCommon::add('back',__('Reply'), Module::create_href(array('rc_reply'=>$rb_obj->record['id'])));
-	Base_ActionBarCommon::add('back',__('Reply All'), Module::create_href(array('rc_replyall'=>$rb_obj->record['id'])));
-	Base_ActionBarCommon::add('edit',__('Forward'), Module::create_href(array('rc_forward'=>$rb_obj->record['id'])));
+	Base_ActionBarCommon::add('reply',__('Reply'), Module::create_href(array('rc_reply'=>$rb_obj->record['id'])));
+	Base_ActionBarCommon::add('reply',__('Reply All'), Module::create_href(array('rc_replyall'=>$rb_obj->record['id'])));
+	Base_ActionBarCommon::add('forward',__('Forward'), Module::create_href(array('rc_forward'=>$rb_obj->record['id'])));
     }
 
     public static function display_attachments($record, $nolink, $desc) {
@@ -187,7 +190,21 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
     }
 
     public static function display_subject($record, $nolink, $desc) {
-		return Utils_RecordBrowserCommon::create_linked_label_r('rc_mails','subject',$record,$nolink).'<br />From: '.$record['from'].'<br />To: '.$record['to'];
+        static $last_message_id = null;
+        $chars_count = 100;
+        $body_preview = strip_tags($record['body']);
+        if (strlen($body_preview) > $chars_count)
+            $body_preview = substr($body_preview, 0, $chars_count) . " ...";
+        $subject_label = Utils_RecordBrowserCommon::create_linked_label_r('rc_mails','subject',$record,$nolink);
+        $subject_label = Utils_TooltipCommon::create($subject_label, "<pre class=\"wrap\">$body_preview</pre>", false);
+        $ret = $subject_label .'<br />From: '.$record['from'].'<br />To: '.$record['to'] . '<br />';
+        $replies = '<div style="text-align:center;float:right;width:20px;font-size:16px;line-height:20px;padding:8px;border-radius:18px;height:20px;background-color:gray;color:white;" class="num_of_replies"></div>';
+        if(!$record['references'] || $last_message_id===null || strpos($record['references'],$last_message_id)===false) {
+            $last_message_id = $record['message_id'];
+            return $replies.$ret;
+        }
+        if(!$last_message_id) return $replies.$ret;
+        return '<div style="margin-left:20px" class="reply parent_'.md5($last_message_id).'">'.$ret.'</div>';
 	}
 
     public static function QFfield_direction(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {

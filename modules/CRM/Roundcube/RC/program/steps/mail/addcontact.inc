@@ -5,8 +5,11 @@
  | program/steps/mail/addcontact.inc                                     |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2009, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2009, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Add the submitted contact to the users address book                 |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: addcontact.inc 4509 2011-02-09 10:51:50Z thomasb $
+ $Id$
 
 */
 
@@ -23,12 +26,21 @@
 if (!$OUTPUT->ajax_call)
   return;
 
-$done = false;
-$CONTACTS = $RCMAIL->get_address_book(null, true);
+$abook = $RCMAIL->config->get('default_addressbook');
+
+// Get configured addressbook
+$CONTACTS = $RCMAIL->get_address_book($abook, true);
+
+// Get first writeable addressbook if the configured doesn't exist
+// This can happen when user deleted the addressbook (e.g. Kolab folder)
+if ($abook == null || !is_object($CONTACTS)) {
+  $source = reset($RCMAIL->get_address_sources(true));
+  $CONTACTS = $RCMAIL->get_address_book($source['id'], true);
+}
 
 if (!empty($_POST['_address']) && is_object($CONTACTS))
 {
-  $contact_arr = $IMAP->decode_address_list(get_input_value('_address', RCUBE_INPUT_POST, true), 1, false);
+  $contact_arr = rcube_mime::decode_address_list(get_input_value('_address', RCUBE_INPUT_POST, true), 1, false);
 
   if (!empty($contact_arr[1]['mailto'])) {
     $contact = array(
@@ -41,19 +53,31 @@ if (!empty($_POST['_address']) && is_object($CONTACTS))
       $OUTPUT->show_message('errorsavingcontact', 'error');
       $OUTPUT->send();
     }
-    else if (!check_email($contact['email'], false)) {
+
+    $email = rcube_idn_to_ascii($contact['email']);
+    if (!check_email($email, false)) {
       $OUTPUT->show_message('emailformaterror', 'error', array('email' => $contact['email']));
       $OUTPUT->send();
     }
 
     $contact['email'] = rcube_idn_to_utf8($contact['email']);
+    $contact = $RCMAIL->plugins->exec_hook('contact_displayname', $contact);
 
-    // use email address part for name
-    if (empty($contact['name']) || $contact['name'] == $contact['email'])
-      $contact['name'] = ucfirst(preg_replace('/[\.\-]/', ' ', substr($contact['email'], 0, strpos($contact['email'], '@'))));
+    if (empty($contact['firstname']) || empty($contact['surname']))
+      $contact['name'] = rcube_addressbook::compose_display_name($contact);
+
+    // validate contact record
+    if (!$CONTACTS->validate($contact, true)) {
+      $error = $CONTACTS->get_error();
+      // TODO: show dialog to complete record
+      // if ($error['type'] == rcube_addressbook::ERROR_VALIDATE) { }
+
+      $OUTPUT->show_message($error['message'] ? $error['message'] : 'errorsavingcontact', 'error');
+      $OUTPUT->send();
+    }
 
     // check for existing contacts
-    $existing = $CONTACTS->search('email', $contact['email'], true, false);
+    $existing = $CONTACTS->search('email', $contact['email'], 1, false);
 
     if ($done = $existing->count)
       $OUTPUT->show_message('contactexists', 'warning');

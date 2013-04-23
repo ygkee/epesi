@@ -1,7 +1,7 @@
 <?php
 /**
  * Filesystem Attachments
- * 
+ *
  * This plugin which provides database backed storage for temporary
  * attachment file handling.  The primary advantage of this plugin
  * is its compatibility with round-robin dns multi-server roundcube
@@ -10,7 +10,8 @@
  * This plugin relies on the core filesystem_attachments plugin
  *
  * @author Ziba Scott <ziba@umich.edu>
- * 
+ * @author Aleksander Machniak <alec@alec.pl>
+ * @version @package_version@
  */
 require_once('plugins/filesystem_attachments/filesystem_attachments.php');
 class database_attachments extends filesystem_attachments
@@ -22,9 +23,10 @@ class database_attachments extends filesystem_attachments
     /**
      * Helper method to generate a unique key for the given attachment file
      */
-    private function _key($filepath)
+    private function _key($args)
     {
-        return  $this->cache_prefix.md5(mktime().$filepath.$_SESSION['user_id']); 
+        $uname = $args['path'] ? $args['path'] : $args['name'];
+        return  $this->cache_prefix . $args['group'] . md5(mktime() . $uname . $_SESSION['user_id']);
     }
 
     /**
@@ -34,8 +36,14 @@ class database_attachments extends filesystem_attachments
     {
         $args['status'] = false;
         $rcmail = rcmail::get_instance();
-        $key = $this->_key($args['path']);
-        $data = base64_encode(file_get_contents($args['path']));
+        $key = $this->_key($args);
+
+        $data = file_get_contents($args['path']);
+
+        if ($data === false)
+            return $args;
+
+        $data = base64_encode($data);
 
         $status = $rcmail->db->query(
             "INSERT INTO ".get_table_name('cache')."
@@ -44,13 +52,13 @@ class database_attachments extends filesystem_attachments
             $_SESSION['user_id'],
             $key,
             $data);
-            
+
         if ($status) {
             $args['id'] = $key;
             $args['status'] = true;
             unset($args['path']);
         }
-        
+
         return $args;
     }
 
@@ -62,10 +70,14 @@ class database_attachments extends filesystem_attachments
         $args['status'] = false;
         $rcmail = rcmail::get_instance();
 
-        $key = $this->_key($args['name']);
+        $key = $this->_key($args);
 
-	if ($args['path'])
-	    $args['data'] = file_get_contents($args['path']);
+        if ($args['path']) {
+            $args['data'] = file_get_contents($args['path']);
+
+            if ($args['data'] === false)
+                return $args;
+        }
 
         $data = base64_encode($args['data']);
 
@@ -76,7 +88,7 @@ class database_attachments extends filesystem_attachments
             $_SESSION['user_id'],
             $key,
             $data);
-        
+
         if ($status) {
             $args['id'] = $key;
             $args['status'] = true;
@@ -99,11 +111,11 @@ class database_attachments extends filesystem_attachments
              AND    cache_key=?",
             $_SESSION['user_id'],
             $args['id']);
-    
+
         if ($status) {
             $args['status'] = true;
         }
-        
+
         return $args;
     }
 
@@ -124,7 +136,7 @@ class database_attachments extends filesystem_attachments
     function get($args)
     {
         $rcmail = rcmail::get_instance();
-        
+
         $sql_result = $rcmail->db->query(
             "SELECT cache_id, data
              FROM ".get_table_name('cache')."
@@ -137,20 +149,21 @@ class database_attachments extends filesystem_attachments
             $args['data'] = base64_decode($sql_arr['data']);
             $args['status'] = true;
         }
-        
+
         return $args;
     }
-    
+
     /**
      * Delete all temp files associated with this user
      */
     function cleanup($args)
     {
+        $prefix = $this->cache_prefix . $args['group'];
         $rcmail = rcmail::get_instance();
         $rcmail->db->query(
             "DELETE FROM ".get_table_name('cache')."
              WHERE  user_id=?
-             AND cache_key like '{$this->cache_prefix}%'",
+             AND cache_key like '{$prefix}%'",
             $_SESSION['user_id']);
     }
 }

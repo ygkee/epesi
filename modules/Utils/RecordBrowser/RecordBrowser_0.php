@@ -61,7 +61,7 @@ class Utils_RecordBrowser extends Module {
     private $current_field = null;
     private $additional_actions_method = null;
     private $filter_crits = array();
-    private $disabled = array('search'=>false, 'browse_mode'=>false, 'watchdog'=>false, 'quickjump'=>false, 'filters'=>false, 'headline'=>false, 'actions'=>false, 'fav'=>false, 'pdf'=>false, 'export'=>false, 'pagination'=>false);
+    private $disabled = array('search'=>false, 'browse_mode'=>false, 'watchdog'=>false, 'quickjump'=>false, 'filters'=>false, 'headline'=>false, 'actions'=>false, 'fav'=>false, 'pdf'=>false, 'export'=>false, 'pagination'=>false, 'jump_to_record'=>false);
     private $force_order;
     private $clipboard_pattern = false;
     private $show_add_in_table = false;
@@ -70,7 +70,7 @@ class Utils_RecordBrowser extends Module {
     public $form = null;
     public $tab;
     public $grid = null;
-	
+
 	public function new_button($type, $label, $href) {
 		if ($this->fullscreen_table)
 			Base_ActionBarCommon::add($type, $label, $href);
@@ -82,7 +82,7 @@ class Utils_RecordBrowser extends Module {
 				'</a>';
 		}
 	}
-	
+
     public function enable_grid($arg) {
         $this->grid = $arg;
     }
@@ -147,6 +147,7 @@ class Utils_RecordBrowser extends Module {
     public function disable_filters(){$this->disabled['filters'] = true;}
     public function disable_quickjump(){$this->disabled['quickjump'] = true;}
     public function disable_headline() {$this->disabled['headline'] = true;}
+    public function disable_jump_to_record() {$this->disabled['jump_to_record'] = true;}
     public function disable_pdf() {$this->disabled['pdf'] = true;}
     public function disable_export() {$this->disabled['export'] = true;}
     public function disable_actions($arg=true) {$this->disabled['actions'] = $arg;}
@@ -220,6 +221,7 @@ class Utils_RecordBrowser extends Module {
 	}
     // BODY //////////////////////////////////////////////////////////////////////////////////////////////////////
     public function body($def_order=array(), $crits=array(), $cols=array(), $filters_set=array()) {
+		Base_HelpCommon::screen_name('browse_'.$this->tab);
         unset($_SESSION['client']['recordbrowser']['admin_access']);
         if ($this->check_for_jump()) return;
         $this->fullscreen_table=true;
@@ -234,7 +236,7 @@ class Utils_RecordBrowser extends Module {
             print(__('You are not authorised to browse this data.'));
             return;
         }
-//        if ($this->watchdog) Utils_WatchdogCommon::add_actionbar_change_subscription_button($this->tab); // Leave it out for now
+        if ($this->watchdog) Utils_WatchdogCommon::add_actionbar_change_subscription_button($this->tab);
         $this->is_on_main_page = true;
 
         $this->data_gb = $this->init_module('Utils/GenericBrowser', null, $this->tab);
@@ -296,7 +298,7 @@ class Utils_RecordBrowser extends Module {
         ob_end_clean();
 
         $theme->assign('table', $table);
-        if (!$this->disabled['headline']) $theme->assign('caption', _V($this->caption).($this->additional_caption?' - '.$this->additional_caption:'').' '.$this->get_jump_to_id_button());
+        if (!$this->disabled['headline']) $theme->assign('caption', _V($this->caption).($this->additional_caption?' - '.$this->additional_caption:'').(!$this->disabled['jump_to_record']?' '.$this->get_jump_to_id_button():''));
         $theme->assign('icon', $this->icon);
         $theme->display('Browsing_records');
     }
@@ -448,14 +450,14 @@ class Utils_RecordBrowser extends Module {
 
         $dont_hide = Base_User_SettingsCommon::get('Utils/RecordBrowser',$this->tab.'_show_filters');
 
+        $vals = $form->exportValues();
+
         $ret = DB::Execute('SELECT * FROM recordbrowser_browse_mode_definitions WHERE tab=%s', array($this->tab));
         while ($row = $ret->FetchRow()) {
             $m = $this->init_module($row['module']);
             $next_dont_hide = false; // FIXME deprecated, to be removed
             $this->display_module($m, array(& $form, & $external_filters, & $vals, & $this->crits, & $next_dont_hide, $this), $row['func']);
         }
-
-        $vals = $form->exportValues();
 
         foreach ($filters_all as $filter) {
             if (in_array(strtolower($filter), $external_filters)) continue;
@@ -557,7 +559,7 @@ class Utils_RecordBrowser extends Module {
         return $x->pop_main();
     }
     //////////////////////////////////////////////////////////////////////////////////////////
-    public function show_data($crits = array(), $cols = array(), $order = array(), $admin = false, $special = false, $pdf = false) {
+    public function show_data($crits = array(), $cols = array(), $order = array(), $admin = false, $special = false, $pdf = false, $limit = null) {
 		$this->help('RecordBrowser','main');
 		if (Utils_RecordBrowserCommon::$admin_access) $admin = true;
         if (isset($_SESSION['client']['recordbrowser']['admin_access'])) Utils_RecordBrowserCommon::$admin_access = true;
@@ -642,7 +644,7 @@ class Utils_RecordBrowser extends Module {
             if (!$pdf && $quickjump!=='' && $args['name']===$quickjump) $each[] = 'quickjump';
             if (!$pdf && !$this->disabled['search']) $each[] = 'search';
             foreach ($each as $e) {
-                if ($args['type']=='text' || $args['type']=='currency' || ($args['type']=='calculated' && preg_match('/^[a-z]+(\([0-9]+\))?$/i',$args['param'])!==0)) $arr[$e] = $args['id'];
+                if ($args['type']=='text' || $args['type']=='currency' || $args['type'] == 'autonumber' || ($args['type']=='calculated' && preg_match('/^[a-z]+(\([0-9]+\))?$/i',$args['param'])!==0)) $arr[$e] = $args['id'];
 				
                 if (isset($args['ref_field'])) $arr[$e] = $args['id'];
                 if ($args['commondata'] && (!is_array($args['param']) || strpos($args['param']['array_id'],':')===false)) {
@@ -678,7 +680,11 @@ class Utils_RecordBrowser extends Module {
 				$table_columns[$k]['width'] = $table_columns[$k]['width'].'%';
 			}
 		}
-		
+		if (empty($table_columns)) {
+			print('Invalid view, no fields to display');
+			return;
+		}
+
 		$gb->set_table_columns( $table_columns );
 		
 		if (!$pdf) {
@@ -783,24 +789,31 @@ class Utils_RecordBrowser extends Module {
 
         $this->amount_of_records = Utils_RecordBrowserCommon::get_records_count($this->tab, $crits, $admin, $order);
 
-		$key = md5(serialize($this->tab).serialize($crits).serialize($cols).serialize($order).serialize($admin));
-		if (!$this->disabled['pdf'] && !$pdf && $this->get_access('print')) {
-			if ($this->amount_of_records<200)
-				$this->new_button('print', __('Print'), 'href="modules/Utils/RecordBrowser/print.php?'.http_build_query(array('key'=>$key, 'cid'=>CID)).'" target="_blank"');
-			else
-				$this->new_button('print', __('Print'), Utils_TooltipCommon::open_tag_attrs(__('Print not available due to amount of records'), false));
-		}
-		$_SESSION['client']['utils_recordbrowser'][$key] = array(
-			'tab'=>$this->tab,
-			'crits'=>$crits,
-			'cols'=>$cols,
-			'order'=>$order,
-			'admin'=>$admin,
-			'more_table_properties'=>$this->more_table_properties
-		);
+        if ($limit === null && !$this->disabled['pagination'])
+            $limit = $gb->get_limit($this->amount_of_records);
 
-        if ($pdf || $this->disabled['pagination']) $limit = null;
-		else $limit = $gb->get_limit($this->amount_of_records);
+		if (!$this->disabled['pdf'] && !$pdf && $this->get_access('print')) {
+            $limited_print_records = 200;
+            $limited_print = ($this->amount_of_records >= $limited_print_records);
+            $print_limit = $limited_print ? $limit : null;
+            $key = md5(serialize($this->tab).serialize($crits).serialize($cols).serialize($order).serialize($admin).serialize($print_limit));
+            $_SESSION['client']['utils_recordbrowser'][$key] = array(
+                'tab'=>$this->tab,
+                'crits'=>$crits,
+                'cols'=>$cols,
+                'order'=>$order,
+                'admin'=>$admin,
+                'more_table_properties'=>$this->more_table_properties,
+                'limit' => $print_limit,
+            );
+            $print_href = 'href="modules/Utils/RecordBrowser/print.php?'.http_build_query(array('key'=>$key, 'cid'=>CID)).'" target="_blank"';
+            $print_tooltip_text = $limited_print ?
+                __('Due to more than %d records, you are allowed to print current view', array($limited_print_records)) :
+                __('Print all records');
+            $print_tooltip = Utils_TooltipCommon::open_tag_attrs($print_tooltip_text, false);
+            $this->new_button('print', __('Print'), "$print_href $print_tooltip");
+		}
+
         $records = Utils_RecordBrowserCommon::get_records($this->tab, $crits, array(), $order, $limit, $admin);
 
         if (($this->get_access('export') || $this->enable_export) && !$this->disabled['export'])
@@ -881,7 +894,7 @@ class Utils_RecordBrowser extends Module {
                 $value = $this->get_val($field, $row, ($special || $pdf), $args);
                 if (strip_tags($value)=='') $value .= '&nbsp;';
                 if ($args['style']=='currency' || $args['style']=='number') $value = array('style'=>'text-align:right;','value'=>$value);
-                if ($grid_enabled && !in_array($args['type'], array('calculated','multiselect'))) {
+                if ($grid_enabled && !in_array($args['type'], array('calculated','multiselect','commondata'))) {
                     $table = '<table class="Utils_RecordBrowser__grid_table" style="width:100%" cellpadding="0" cellspacing="0" border="0"><tr><td id="grid_form_field_'.$argsid.'_'.$row['id'].'" style="display:none;">Loading...</td><td id="grid_value_field_'.$argsid.'_'.$row['id'].'">';
                     $ed_icon = '</td><td style="min-width:18px;width:18px;padding:0px;margin:0px;">'.
                                 '<span id="grid_edit_'.$argsid.'_'.$row['id'].'" style="float:right;display:none;"><a href="javascript:void(0);" onclick="grid_enable_field_edit(\''.$argsid.'\','.$row['id'].',\''.$this->tab.'\',\''.$form_name.'\');"><img border="0" src="'.Base_ThemeCommon::get_template_file('Utils/GenericBrowser', 'edit.png').'"></a></span>'.
@@ -911,6 +924,7 @@ class Utils_RecordBrowser extends Module {
                     );
                 }
 				if ($pdf) {
+                    $value['overflow_box'] = false;
 					$value['attrs'] = $attrs.' style="border:1px solid black;" width="'.$table_columns[$k]['width'].'"';
 					$value['value'] = '&nbsp;'.$value['value'].'&nbsp;';
 				}
@@ -922,19 +936,22 @@ class Utils_RecordBrowser extends Module {
                 if ($this->disabled['actions']===false) $da = array();
                 else $da = array_flip($this->disabled['actions']);
                 if (!$special) {
-                    if (!isset($da['view'])) $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_entry', 'view', $row['id'])),'View');
-					else $gb_row->add_action('','View',__('You don\'t have permission to view this record.'),null,0,true);
-                    if (!isset($da['edit']) && $this->get_access('edit',$row)) $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_entry', 'edit',$row['id'])),'Edit');
-					else $gb_row->add_action('','Edit',__('You don\'t have permission to edit this record.'),null,0,true);
+                    if (!isset($da['view'])) $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_entry', 'view', $row['id'])),__('View'), null, 'view');
+					if (!isset($da['edit'])) {
+						if ($this->get_access('edit',$row)) $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_entry', 'edit',$row['id'])),__('Edit'), null, 'edit');
+						else $gb_row->add_action('',__('Edit'),__('You don\'t have permission to edit this record.'),'edit',0,true);
+					}
                     if ($admin) {
-                        if (!$row[':active']) $gb_row->add_action($this->create_callback_href(array($this,'set_active'),array($row['id'],true)),'Activate', null, 'active-off');
-                        else $gb_row->add_action($this->create_callback_href(array($this,'set_active'),array($row['id'],false)),'Deactivate', null, 'active-on');
+                        if (!$row[':active']) $gb_row->add_action($this->create_callback_href(array($this,'set_active'),array($row['id'],true)),__('Activate'), null, 'active-off');
+                        else $gb_row->add_action($this->create_callback_href(array($this,'set_active'),array($row['id'],false)),__('Deactivate'), null, 'active-on');
                         $info = Utils_RecordBrowserCommon::get_record_info($this->tab, $row['id']);
-                        if ($info['edited_on']===null) $gb_row->add_action('','This record was never edited',null,'history_inactive');
-                        else $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_edit_history', $row['id'])),'View edit history',null,'history');
+                        if ($info['edited_on']===null) $gb_row->add_action('',__('This record was never edited'),null,'history_inactive');
+                        else $gb_row->add_action($this->create_callback_href(array($this,'navigate'),array('view_edit_history', $row['id'])),__('View edit history'),null,'history');
                     } else {
-						if (!isset($da['delete']) && $this->get_access('delete',$row)) $gb_row->add_action($this->create_confirm_callback_href(__('Are you sure you want to delete this record?'),array('Utils_RecordBrowserCommon','delete_record'),array($this->tab, $row['id'])),'Delete');
-						else $gb_row->add_action('','Delete',__('You don\'t have permission to delete this record'),null,0,true);
+						if (!isset($da['delete'])) {
+                            if ($this->get_access('delete',$row)) $gb_row->add_action($this->create_confirm_callback_href(__('Are you sure you want to delete this record?'),array('Utils_RecordBrowserCommon','delete_record'),array($this->tab, $row['id'])),__('Delete'), null, 'delete');
+                            else $gb_row->add_action('',__('Delete'),__('You don\'t have permission to delete this record'),'delete',0,true);
+                        }
 					}
                 }
                 if (!isset($da['info'])) $gb_row->add_info(($this->browse_mode=='recent'?'<b>'.__('Visited on: %s', array($row['visited_on'])).'</b><br>':'').Utils_RecordBrowserCommon::get_html_record_info($this->tab, isset($info)?$info:$row['id']));
@@ -1045,6 +1062,7 @@ class Utils_RecordBrowser extends Module {
         return $this->view_entry($mode, $id, $defaults, $show_actions);
     }
     public function view_entry($mode='view', $id = null, $defaults = array(), $show_actions=true) {
+		Base_HelpCommon::screen_name('rb_'.$mode.'_'.$this->tab);
         if (isset($_SESSION['client']['recordbrowser']['admin_access'])) Utils_RecordBrowserCommon::$admin_access = true;
         self::$mode = $mode;
         if ($this->navigation_executed) {
@@ -1105,7 +1123,7 @@ class Utils_RecordBrowser extends Module {
                 print(__('You don\'t have permission to view this record.'));
                 if ($show_actions===true || (is_array($show_actions) && (!isset($show_actions['back']) || $show_actions['back']))) {
                     Base_ActionBarCommon::add('back', __('Back'), $this->create_back_href());
-                    Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
+                    //Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
                 }
                 return true;
             }
@@ -1114,7 +1132,7 @@ class Utils_RecordBrowser extends Module {
 			print(__('You don\'t have permission to perform this action.'));
 			if ($show_actions===true || (is_array($show_actions) && (!isset($show_actions['back']) || $show_actions['back']))) {
 				Base_ActionBarCommon::add('back', __('Back'), $this->create_back_href());
-				Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
+				//Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
 			}
 			return true;
 		}
@@ -1122,7 +1140,7 @@ class Utils_RecordBrowser extends Module {
         if($mode == 'add' || $mode == 'edit') {
             $theme -> assign('click2fill', '<div id="c2fBox"></div>');
             load_js('modules/Utils/RecordBrowser/click2fill.js');
-            eval_js('initc2f("'.__('Scan/Edit').'","'.__('Paste your data here').'")');
+            eval_js('initc2f("'.__('Scan/Edit').'","'.__('Paste data here with Ctrl-v, click button below, then click on separated words in specific order and click in text field where you want put those words. They will replace text in that field.').'")');
             Base_ActionBarCommon::add('clone', __('Click 2 Fill'), 'href="javascript:void(0)" onclick="c2f()"');
         }
 
@@ -1214,7 +1232,7 @@ class Utils_RecordBrowser extends Module {
                 Base_ActionBarCommon::add('save', __('Save'), $form->get_submit_form_href());
                 Base_ActionBarCommon::add('delete', __('Cancel'), $this->create_back_href());
             }
-            Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
+            //Utils_ShortcutCommon::add(array('esc'), 'function(){'.$this->create_back_href_js().'}');
         }
 
         if ($mode!='add') {
@@ -1464,14 +1482,27 @@ class Utils_RecordBrowser extends Module {
         if (!$main_page && self::$mode=='view') print('</form>');
     }
 
-    public function timestamp_required($v) {
-        return $v['__datepicker']!=='' && Base_RegionalSettingsCommon::reg2time($v['__datepicker'],false)!==false;
+    public function check_new_record_access($data) {
+		$problems = array();
+		$ret = array();
+		foreach (Utils_RecordBrowser::$last_record as $k=>$v) if (!isset($data[$k])) $data[$k] = $v;
+		$crits = Utils_RecordBrowserCommon::get_access($this->tab,'add',null, true);
+		Utils_RecordBrowserCommon::check_record_against_crits($this->tab, $data, $crits, $problems);
+		foreach ($problems as $f) {
+			$f = explode('[', $f);
+			$ret[$f[0]] = __('Invalid value');
+		}
+		return empty($ret)?true:$ret;
     }
-
     public function prepare_view_entry_details($record, $mode, $id, $form, $visible_cols = null, $for_grid=false){
+	if ($mode == 'add')
+	    $form->addFormRule(array($this, 'check_new_record_access'));
         foreach($this->table_rows as $field => $args){
+            // check permissions
             if (isset($this->view_fields_permission[$args['id']]) && !$this->view_fields_permission[$args['id']]) continue;
+            // check visible cols
             if ($visible_cols!==null && !isset($visible_cols[$args['id']])) continue;
+            // set default value to '' if not set at all
             if (!isset($record[$args['id']])) $record[$args['id']] = '';
             if ($for_grid) {
                 $nk = '__grid_'.$args['id'];
@@ -1483,213 +1514,32 @@ class Utils_RecordBrowser extends Module {
                 $form->setDefaults(array($args['id']=>$record[$args['id']]));
                 continue;
             }
-			if ($mode=='view' && Base_User_SettingsCommon::get('Utils/RecordBrowser','hide_empty') && $this->field_is_empty($record, $args['id']) && $args['type']!='checkbox') {
+            // is set then hide empty fields that are not checkboxes
+			if ($mode == 'view' && $args['type'] != 'checkbox' && Base_User_SettingsCommon::get('Utils/RecordBrowser','hide_empty') && $this->field_is_empty($record, $args['id'])) {
 				eval_js('var e=$("_'.$args['id'].'__data");if(e)e.up("tr").style.display="none";');
 			}
+            // translate label and put it into span with id
             $label = '<span id="_'.$args['id'].'__label">'._V($args['name']).'</span>'; // TRSL
             if (isset($this->QFfield_callback_table[$field])) {
 				//$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
                 $ff = $this->QFfield_callback_table[$field];
-                call_user_func_array($ff, array(&$form, $args['id'], $label, $mode, $mode=='add'?(isset($this->custom_defaults[$args['id']])?$this->custom_defaults[$args['id']]:''):$record[$args['id']], $args, $this, $this->display_callback_table));
             } else {
-                if ($mode!=='add' && $mode!=='edit') {
-                    if ($args['type']!='checkbox' || isset($this->display_callback_table[$field])) {
-                        $def = $this->get_val($field, $record, false, $args);
-                        $form->addElement('static', $args['id'], $label, $def, array('id'=>$args['id']));
-                        continue;
+                $ff = Utils_RecordBrowserCommon::get_default_QFfield_callback($args['type']);
+            }
+            if (!is_callable($ff))
+                continue;
+
+            call_user_func_array($ff, array(&$form, $args['id'], $label, $mode, $mode=='add'?(isset($this->custom_defaults[$args['id']])?$this->custom_defaults[$args['id']]:''):$record[$args['id']], $args, $this, $this->display_callback_table));
+
+            if ($args['required']) {
+                $el = $form->getElement($args['id']);
+                if (!$form->isError($el)) {
+                    if ($el->getType() != 'static') {
+                        $form->addRule($args['id'], __('Field required'), 'required');
+                        $el->setAttribute('placeholder', __('Field required'));
                     }
                 }
-                switch ($args['type']) {
-                    case 'calculated':  $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('static', $args['id'], $label);
-//                                      if ($mode=='edit')
-                                        if (!is_array($this->record))
-                                            $values = $this->custom_defaults;
-                                        else {
-                                            $values = $this->record;
-                                            if (is_array($this->custom_defaults)) $values = $values+$this->custom_defaults;
-                                        }
-                                        $val = @$this->get_val($field, $values, true, $args);
-                                        if (!$val) $val = '['.__('formula').']';
-                                        $form->setDefaults(array($args['id']=>'<div class="static_field" id="'.Utils_RecordBrowserCommon::get_calculated_id($this->tab, $args['id'], $id).'">'.$val.'</div>'));
-                                        break;
-                    case 'integer':
-                    case 'float':       $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('text', $args['id'], $label, array('id'=>$args['id']));
-                                        if ($args['type']=='integer')
-                                            $form->addRule($args['id'], __('Only integer numbers are allowed.'), 'regex', '/^[0-9]*$/');
-                                        else
-                                            $form->addRule($args['id'], __('Only numbers are allowed.'), 'numeric');
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'checkbox':    $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('checkbox', $args['id'], $label, '', array('id'=>$args['id']));
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'currency':    $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('currency', $args['id'], $label, array('id'=>$args['id']));
-//                                      if ($mode!=='add') $form->setDefaults(array($args['id']=>Utils_CurrencyFieldCommon::format_default($record[$args['id']])));
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'text':        $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type'], $args['param']);
-										$form->addElement('text', $args['id'], $label, array('id'=>$args['id'], 'maxlength'=>$args['param']));
-//                                      else $form->addElement('static', $args['id'], $label, array('id'=>$args['id']));
-                                        $form->addRule($args['id'], __('Maximum length for this field is %s characters.',array($args['param'])), 'maxlength', $args['param']);
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'long text':   $label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement($this->add_in_table?'text':'textarea', $args['id'], $label, array('id'=>$args['id']));
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'date':		$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('datepicker', $args['id'], $label, array('id'=>$args['id'], 'label'=>$this->add_in_table?'':null));
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'timestamp':   $f_param = array('id'=>$args['id']);
-										if ($args['param']) $f_param['optionIncrement'] = array('i'=>$args['param']);
-										$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-										$form->addElement('timestamp', $args['id'], $label, $f_param);
-                                        static $rule_defined = false;
-                                        if (!$rule_defined) $form->registerRule('timestamp_required', 'callback', 'timestamp_required', $this);
-                                        $rule_defined = true;
-                                        if (isset($args['required']) && $args['required']) $form->addRule($args['id'], __('Field required'), 'timestamp_required');
-                                        if ($mode!=='add' && $record[$args['id']]) $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'time':        $time_format = Base_RegionalSettingsCommon::time_12h()?'h:i a':'H:i';
-                                        $lang_code = Base_LangCommon::get_lang_code();
-										$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type']);
-                                        $form->addElement('timestamp', $args['id'], $label, array('date'=>false, 'format'=>$time_format, 'optionIncrement'  => array('i' => 5),'language'=>$lang_code, 'id'=>$args['id']));
-                                        if ($mode!=='add' && $record[$args['id']]) $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'commondata':  $param = explode('::',$args['param']['array_id']);
-                                        foreach ($param as $k=>$v) if ($k!=0) $param[$k] = preg_replace('/[^a-z0-9]/','_',strtolower($v));
-										$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type'], $args['param']['array_id']);
-                                        $form->addElement($args['type'], $args['id'], $label, $param, array('empty_option'=>true, 'id'=>$args['id'], 'order_by_key'=>$args['param']['order_by_key']));
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                    case 'select':
-                    case 'multiselect': $comp = array();
-                                        $ref = explode(';',$args['param']);
-                                        if (isset($ref[1])) $crits_callback = $ref[1];
-                                        else $crits_callback = null;
-                                        if (isset($ref[2])) $multi_adv_params = call_user_func(explode('::',$ref[2]), $record);
-                                        else $multi_adv_params = null;
-                                        if (!isset($multi_adv_params) || !is_array($multi_adv_params)) $multi_adv_params = array();
-                                        if (!isset($multi_adv_params['order'])) $multi_adv_params['order'] = array();
-                                        if (!isset($multi_adv_params['cols'])) $multi_adv_params['cols'] = array();
-                                        if (!isset($multi_adv_params['format_callback'])) $multi_adv_params['format_callback'] = array();
-                                        $ref = $ref[0];
-										$refe = explode('::',$ref);
-										$tab = $refe[0];
-										$col = isset($refe[1])?$refe[1]:null;
-                                        if (!isset($col)) trigger_error($field);
-                                        if ($tab=='__COMMON__') {
-											$order = isset($refe[2])?$refe[2]:'value';
-                                            $data = Utils_CommonDataCommon::get_translated_tree($col, $order=='key');
-                                            if (!is_array($data)) $data = array();
-                                            $comp = $comp+$data;
-                                            $rec_count = 0;
-											$label = Utils_RecordBrowserCommon::get_field_tooltip($label, 'commondata', $col);
-                                        } else {
-                                            if (isset($crits_callback)) {
-                                                $crit_callback = explode('::',$crits_callback);
-                                                if (is_callable($crit_callback)) {
-                                                    $crits = call_user_func($crit_callback, false, $record);
-                                                    $adv_crits = call_user_func($crit_callback, true, $record);
-                                                } else $crits = $adv_crits = array();
-                                                if ($adv_crits === $crits) $adv_crits = null;
-                                                if ($adv_crits !== null) {
-                                                    $crits = $adv_crits;
-                                                }
-                                            } else $crits = array();
-                                            $col = explode('|',$col);
-                                            $col_id = array();
-                                            foreach ($col as $c) $col_id[] = preg_replace('/[^a-z0-9]/','_',strtolower($c));
-                                            $rec_count = Utils_RecordBrowserCommon::get_records_count($tab, $crits, null, !empty($multi_adv_params['order'])?$multi_adv_params['order']:array());
-                                            if ($rec_count<=Utils_RecordBrowserCommon::$options_limit) {
-                                                $records = Utils_RecordBrowserCommon::get_records($tab, $crits, empty($multi_adv_params['format_callback'])?$col_id:array(), !empty($multi_adv_params['order'])?$multi_adv_params['order']:array());
-                                            } else {
-                                                $records = array();
-                                            }
-                                            $ext_rec = array();
-                                            if (isset($record[$args['id']])) {
-                                                if (!is_array($record[$args['id']])) {
-                                                    if ($record[$args['id']]!='') $record[$args['id']] = array($record[$args['id']]=>$record[$args['id']]); else $record[$args['id']] = array();
-                                                }
-                                            }
-                                            if (isset($this->custom_defaults[$args['id']])) {
-                                                if (!is_array($this->custom_defaults[$args['id']]))
-                                                    $record[$args['id']][$this->custom_defaults[$args['id']]] = $this->custom_defaults[$args['id']];
-                                                else {
-                                                    foreach ($this->custom_defaults[$args['id']] as $v)
-                                                        $record[$args['id']][$v] = $v;
-                                                }
-                                            }
-                                            $single_column = (count($col_id)==1);
-                                            if (isset($record[$args['id']])) {
-                                                $ext_rec = array_flip($record[$args['id']]);
-                                                foreach($ext_rec as $k=>$v) {
-                                                    $c = Utils_RecordBrowserCommon::get_record($tab, $k);
-                                                    if (!empty($multi_adv_params['format_callback'])) $n = call_user_func($multi_adv_params['format_callback'], $c);
-                                                    else {
-                                                        if ($single_column) $n = $c[$col_id[0]];
-                                                        else {
-                                                            $n = array();
-                                                            foreach ($col_id as $cid) $n[] = $c[$cid];
-                                                            $n = implode(' ',$n);
-                                                        }
-                                                    }
-                                                    $comp[$k] = $n;
-                                                }
-                                            }
-                                            if (!empty($multi_adv_params['order'])) natcasesort($comp);
-                                            foreach ($records as $k=>$v) {
-                                                if (!empty($multi_adv_params['format_callback'])) $n = call_user_func($multi_adv_params['format_callback'], $v);
-                                                else {
-//                                                  $n = $v[$col_id];
-                                                    if ($single_column) $n = $v[$col_id[0]];
-                                                    else {
-                                                        $n = array();
-                                                        foreach ($col_id as $cid) $n[] = $v[$cid];
-                                                        $n = implode(' ',$n);
-                                                    }
-                                                }
-                                                $comp[$k] = $n;
-                                                unset($ext_rec[$v['id']]);
-                                            }
-                                            if (empty($multi_adv_params['order'])) natcasesort($comp);
-											$label = Utils_RecordBrowserCommon::get_field_tooltip($label, $args['type'], $tab, $crits);
-
-                                        }
-										if ($rec_count>Utils_RecordBrowserCommon::$options_limit) {
-											$f_callback = $multi_adv_params['format_callback'];
-											if ($args['type']=='multiselect') {
-												$el = $form->addElement('automulti', $args['id'], $label, array('Utils_RecordBrowserCommon','automulti_suggestbox'), array($this->tab, $crits, $f_callback, $args['param']), $f_callback);
-												${'rp_'.$args['id']} = $this->init_module('Utils/RecordBrowser/RecordPicker',array());
-												$filters_defaults = isset($multi_adv_params['filters_defaults'])?$multi_adv_params['filters_defaults']:array();
-												$this->display_module(${'rp_'.$args['id']}, array($this->tab,$args['id'],$multi_adv_params['format_callback'],$crits,array(),array(),array(),$filters_defaults));
-												$el->set_search_button('<a '.${'rp_'.$args['id']}->create_open_href().' '.Utils_TooltipCommon::open_tag_attrs(__('Advanced Selection')).' href="javascript:void(0);"><img border="0" src="'.Base_ThemeCommon::get_template_file('Utils_RecordBrowser','icon_zoom.png').'"></a>');
-												} else {
-													if (empty($f_callback)) $f_callback = array('Utils_RecordBrowserCommon', 'autoselect_label');
-													$form->addElement('autoselect', $args['id'], $label, $comp, array(array('Utils_RecordBrowserCommon','automulti_suggestbox'), array($this->tab, $crits, $f_callback, $args['param'])), $f_callback);
-												}
-                                        } else {
-                                            if ($args['type']==='select') $comp = array(''=>'---')+$comp;
-                                            $form->addElement($args['type'], $args['id'], $label, $comp, array('id'=>$args['id']));
-                                        }
-                                        if ($mode!=='add') $form->setDefaults(array($args['id']=>$record[$args['id']]));
-                                        break;
-                }
             }
-            if ($args['required']) {
-				$el = $form->getElement($args['id']);
-				if (!$form->isError($el)) {
-					if ($el->getType()!='static') {
-						$form->addRule($args['id'], __('Field required'), 'required');
-						$el->setAttribute('placeholder', __('Field required'));
-					}
-				}
-			}
         }
     }
     public function update_record($id,$values) {
@@ -1837,7 +1687,7 @@ class Utils_RecordBrowser extends Module {
         $form = $this->init_module('Libs/QuickForm');
         $r = Utils_RecordBrowserCommon::get_clipboard_pattern($this->tab, true);
         $form->addElement('select', 'enable', __('Enable'), array(__('No'), __('Yes')));
-        $info = '<b>'.__('This is an html pattern. All html tags are allowed.').'<br/>'.__('Use &lt;pre&gt; some text &lt;/pre&gt; to generate text identical as you typed it.').'<br/><br/>'.__('Conditional use:').'<br/>'.__('%%{lorem {keyword} ipsum {keyword2}}').'<br/>'.__('lorem ipsum will be shown only when at least one of keywords has a value. Nested conditions are allowed.').'<br/><br/>'.__('Normal use:').'<br/>'.__('%%{{keyword}}').'<br/><br/>'.__('Keywords:').'<br/></b>';
+        $info = '<b>'.__('This is an html pattern. All html tags are allowed.').'<br/>'.__('Use &lt;pre&gt; some text &lt;/pre&gt; to generate text identical as you typed it.').'<br/><br/>'.__('Conditional use:').'<br/>'.__('%%{lorem {keyword} ipsum {keyword2}}').'<br/>'.__('lorem ipsum will be shown only when at least one of keywords has a value. Nested conditions are allowed.').'<br/><br/>'.__('Normal use:').'<br/>'.__('%%{{keyword}}').'<br/><br/>'.__('Keywords').':<br/></b>';
         foreach($this->table_rows as $name=>$val) {
             $info .= '<b>'.$val['id'].'</b> - '.$name.', ';
         }
@@ -1906,8 +1756,51 @@ class Utils_RecordBrowser extends Module {
 				if ($args['position']>3)
 					$gb_row->add_action($this->create_callback_href(array($this, 'move_field'),array($field, $args['position'], -1)),'Move up', null, 'move-up');
 			}
-            if ($args['type']=='text')
-                $args['param'] = __('Length').' '.$args['param'];
+            switch ($args['type']) {
+				case 'text':
+					$args['param'] = __('Length').' '.$args['param'];
+					break;
+				case 'select':
+				case 'multiselect':
+					$reg = explode(';', $args['param']);
+					$rege = explode('::', $reg[0]);
+					if ($rege[0]!='__COMMON__') {
+						$param = __('Source').': Record Set'.'<br/>';
+						$param .= __('Recordset').': '.Utils_RecordBrowserCommon::get_caption($rege[0]).'<br/>';
+						$fs = explode('|', isset($rege[1])?$rege[1]:'');
+						foreach ($fs as $k=>$v)
+							$fs[$k] = _V($v); // ****** RecordBrowser - field name
+						$param .= __('Related field(s)').': '.(implode(', ',$fs)).'<br/>';
+						$param .= __('Crits callback').': '.(!isset($reg[1]) || $reg[1]=='::'?'---':$reg[1]);
+						$args['param'] = $param;
+						break;
+					} else {
+						$args['param'] = array('array_id'=>$rege[1], 'order_by_key'=>(isset($rege[2]) && $rege[2]=='key'));
+						$args['type'] = 'multiselect';
+					}
+				case 'commondata':
+					if ($args['type']=='commondata') $args['type'] = 'select';
+					$param = __('Source').': CommonData'.'<br/>';
+					$param .= __('Table').': '.$args['param']['array_id'].'<br/>';
+					$param .= __('Order by').': '.($args['param']['order_by_key']?__('Key'):__('Value'));
+					$args['param'] = $param;
+					break;
+				default:
+					$args['param'] = '';
+			}
+			$types = array(
+				'hidden'=>__('Hidden'),
+				'calculated'=>__('Calculated'),
+				'currency'=>__('Currency'),
+				'checkbox'=>__('Checkbox'),
+				'date'=>__('Date'),
+				'integer'=>__('Integer'),
+				'float'=>__('Float'),
+				'text'=>__('Text'),
+				'long text'=>__('Long text'),
+				'select'=>__('Select field'),
+				'multiselect'=>__('Multiselect field')
+			);
             if ($args['type'] == 'page_split')
                     $gb_row->add_data(
                         array('style'=>'background-color: #DFDFFF;', 'value'=>$field),
@@ -1932,10 +1825,10 @@ class Utils_RecordBrowser extends Module {
 					} else $QF_c = '';
                     $gb_row->add_data(
                         $field,
-                        $args['type'],
-                        $args['visible']?__('<b>Yes</b>'):__('No'),
-                        $args['required']?__('<b>Yes</b>'):__('No'),
-                        $args['filter']?__('<b>Yes</b>'):__('No'),
+                        isset($types[$args['type']])?$types[$args['type']]:$args['type'],
+                        $args['visible']?'<b>'.__('Yes').'</b>':__('No'),
+                        $args['required']?'<b>'.__('Yes').'</b>':__('No'),
+                        $args['filter']?'<b>'.__('Yes').'</b>':__('No'),
                         is_array($args['param'])?serialize($args['param']):$args['param'],
 						$d_c,
 						$QF_c
@@ -1956,21 +1849,28 @@ class Utils_RecordBrowser extends Module {
         return false;
     } //submit_delete_field
     //////////////////////////////////////////////////////////////////////////////////////////
+	private $admin_field_mode = '';
+	private $admin_field_type = '';
+	private $admin_field_name = '';
+	private $admin_field = '';
     public function view_field($action = 'add', $field = null) {
         if (!$action) $action = 'add';
         if ($this->is_back()) return false;
+        if ($this->check_for_jump()) return;
         $data_type = array(
-            'currency'=>'currency',
-            'checkbox'=>'checkbox',
-            'date'=>'date',
-            'integer'=>'integer',
-            'float'=>'float',
-            'text'=>'text',
-            'long text'=>'long text',
-			'commondata'=>'commondata'
+            'autonumber'=>__('Autonumber'),
+            'currency'=>__('Currency'),
+            'checkbox'=>__('Checkbox'),
+            'date'=>__('Date'),
+            'integer'=>__('Integer'),
+            'float'=>__('Float'),
+            'text'=>__('Text'),
+            'long text'=>__('Long text'),
+			'select'=>__('Select field')
         );
         natcasesort($data_type);
-
+		
+		load_js('modules/Utils/RecordBrowser/js/field_admin.js');
         $form = $this->init_module('Libs/QuickForm');
 
         switch ($action) {
@@ -1987,61 +1887,115 @@ class Utils_RecordBrowser extends Module {
         $form->addRule('field', __('Field with this name already exists.'), 'check_if_column_exists');
         $form->addRule('field', __('Field length cannot be over 32 characters.'), 'maxlength', 32);
         $form->addRule('field', __('Invalid field name.'), 'regex', '/^[a-zA-Z][a-zA-Z \(\)\%0-9]*$/');
-        $form->addRule('field', __('"ID" as field name is not allowed.'), 'check_if_no_id');
+        $form->addRule('field', __('Invalid field name.'), 'check_if_no_id');
 
 
         if ($action=='edit') {
             $row = DB::GetRow('SELECT field, type, visible, required, param, filter, extra FROM '.$this->tab.'_field WHERE field=%s',array($field));
-            $form->setDefaults($row);
-            $form->addElement('static', 'select_data_type', __('Data Type'), $row['type']);
-			if (!$row['extra']) $form->freeze('field');
-            $selected_data= $row['type'];
-        } else {
-            $form->addElement('select', 'select_data_type', __('Data Type'), $data_type);
-            $selected_data= $form->exportValue('select_data_type');
-            $form->setDefaults(array('visible'=>1));
-        }
-        switch($selected_data) {
-            case 'text':
-                if ($action=='edit')
-                    $form->addElement('static', 'text_length', __('Length'), $row['param']);
-                else {
-                    $form->addElement('text', 'text_length', __('Length'));
-                    $form->addRule('text_length', __('Field required'), 'required');
-                    $form->addRule('text_length', __('Must be a number greater than 0.'), 'regex', '/^[1-9][0-9]*$/');
-                }
-                break;
-			case 'multiselect':
-				if ($action=='edit') {
-					$refe = explode('::',$row['param']);
+			switch ($row['type']) {
+				case 'select':
+					$row['select_data_type'] = 'select';
+					$row['select_type'] = 'select';
+					$row['data_source'] = 'rset';
+					$ref = explode(';', $row['param']);
+					$refe = explode('::',$ref[0]);
+					$row['rset'] = $refe[0];
+					$row['label_field'] = str_replace('|', ', ', $refe[1]);
+					break;
+				case 'multiselect':
+					$row['select_data_type'] = 'select';
+					$row['select_type'] = 'multiselect';
+					$ref = explode(';', $row['param']);
+					$refe = explode('::',$ref[0]);
 					$tab = $refe[0];
-					$col = isset($refe[1])?$refe[1]:null;
 					if ($tab=='__COMMON__') {
+						$row['data_source'] = 'commondata';
 						$order = isset($refe[2])?$refe[2]:'value';
-						$row['param'] = '__'.$col;
-						$form->setDefaults(array('select_type'=>'multi', 'order_by'=>$order=='key'?'key':'value'));
+						$row['order_by'] = ($order=='key'?'key':'value');
+						$row['commondata_table'] = $refe[1];
 					} else {
-						break;
+						$row['label_field'] = str_replace('|', ', ', $refe[1]);
+						$row['data_source'] = 'rset';
+						$row['rset'] = $tab;
 					}
-				}
-			case 'commondata':
-				$form->addElement('text', 'commondata_table', __('CommonData table'));
-				$form->addElement('select', 'select_type', __('Type'), array('select'=>__('Single value selection'), 'multi'=>__('Multiple values selection')));
-				$form->addElement('select', 'order_by', __('Order by'), array('key'=>__('Key'), 'value'=>__('Value')));
-				$form->addRule('commondata_table', __('Field required'), 'required');
-				if ($action=='edit') {
+					break;
+				case 'commondata':
+					$row['select_data_type'] = 'select';
+					$row['select_type'] = 'select';
+					$row['data_source'] = 'commondata';
 					$param = Utils_RecordBrowserCommon::decode_commondata_param($row['param']);
 					$form->setDefaults(array('order_by'=>$param['order_by_key']?'key':'value', 'commondata_table'=>$param['array_id']));
-				}
-				break;
+					break;
+                case 'autonumber':
+                    $row['select_data_type'] = 'autonumber';
+                    Utils_RecordBrowserCommon::decode_autonumber_param($row['param'], $autonumber_prefix, $autonumber_pad_length, $autonumber_pad_mask);
+                    $row['autonumber_prefix'] = $autonumber_prefix;
+                    $row['autonumber_pad_length'] = $autonumber_pad_length;
+                    $row['autonumber_pad_mask'] = $autonumber_pad_mask;
+                    break;
+				case 'text':
+					$row['text_length'] = $row['param'];
+				default:
+					$row['select_data_type'] = $row['type'];
+					if (!isset($data_type[$row['type']]))
+						$data_type[$row['type']] = _V(ucfirst($row['type'])); // ****** - field type
+			}
+			if (!isset($row['rset'])) $row['rset'] = 'contact';
+			if (!isset($row['data_source'])) $row['data_source'] = 'commondata';
+            $form->setDefaults($row);
+            $selected_data = $row['type'];
+			$this->admin_field_type = $row['select_data_type'];
+			$this->admin_field = $row;
+        } else {
+            $selected_data = $form->exportValue('select_data_type');
+            $form->setDefaults(array('visible'=>1,
+                'autonumber_prefix'=>'#',
+                'autonumber_pad_length'=>'6',
+                'autonumber_pad_mask'=>'0'));
         }
-        $form->addElement('checkbox', 'visible', __('Table view'));
-        $form->addElement('checkbox', 'required', __('Required'));
-        $form->addElement('checkbox', 'filter', __('Filter enabled'));
+		$this->admin_field_mode = $action;
+		$this->admin_field_name = $field;
+		
+		$form->addElement('select', 'select_data_type', __('Data Type'), $data_type, array('id'=>'select_data_type', 'onchange'=>'RB_hide_form_fields()'));
 
-        $form->addElement('header', null, __('For advanced users'));
-        $form->addElement('text', 'display_callback', __('Value display function'), array('maxlength'=>255, 'style'=>'width:300px'));
-        $form->addElement('text', 'QFfield_callback', __('Field generator function'), array('maxlength'=>255, 'style'=>'width:300px'));
+		$form->addElement('text', 'text_length', __('Maximum Length'), array('id'=>'length'));
+
+		$form->addElement('select', 'data_source', __('Source of Data'), array('rset'=>__('Recordset'), 'commondata'=>__('CommonData')), array('id'=>'data_source', 'onchange'=>'RB_hide_form_fields()'));
+		$form->addElement('select', 'select_type', __('Type'), array('select'=>__('Single value selection'), 'multiselect'=>__('Multiple values selection')), array('id'=>'select_type'));
+		$form->addElement('select', 'order_by', __('Order by'), array('key'=>__('Key'), 'value'=>__('Value')), array('id'=>'order_by'));
+		$form->addElement('text', 'commondata_table', __('CommonData table'), array('id'=>'commondata_table'));
+
+		$tabs = DB::GetAll('SELECT tab FROM recordbrowser_table_properties');
+		$tables = array();
+		foreach($tabs as $v)
+			$tables[$v['tab']] = Utils_RecordBrowserCommon::get_caption($v['tab']);
+		asort($tables);
+		$form->addElement('select', 'rset', __('Recordset'), $tables, array('id'=>'rset'));
+		$form->addElement('text', 'label_field', __('Related field(s)'), array('id'=>'label_field'));
+
+		$form->addFormRule(array($this, 'check_field_definitions'));
+
+		$form->addElement('checkbox', 'visible', __('Table view'));
+		$form->addElement('checkbox', 'required', __('Required'), null, array('id'=>'required'));
+		$form->addElement('checkbox', 'filter', __('Filter enabled'), null, array('id' => 'filter'));
+        
+        $form->addElement('text', 'autonumber_prefix', __('Prefix string'), array('id' => 'autonumber_prefix'));
+        $form->addRule('autonumber_prefix', __('Double underscore is not allowed'), 'callback', array('Utils_RecordBrowser', 'qf_rule_without_double_underscore'));
+        $form->addElement('text', 'autonumber_pad_length', __('Pad length'), array('id' => 'autonumber_pad_length'));
+        $form->addRule('autonumber_pad_length', __('Only integer numbers are allowed.'), 'regex', '/^[0-9]*$/');
+        $form->addElement('text', 'autonumber_pad_mask', __('Pad character'), array('id' => 'autonumber_pad_mask'));
+        $form->addRule('autonumber_pad_mask', __('Double underscore is not allowed'), 'callback', array('Utils_RecordBrowser', 'qf_rule_without_double_underscore'));
+
+		$form->addElement('checkbox', 'advanced', __('Edit advanced properties'), null, array('onchange'=>'RB_advanced_settings()', 'id'=>'advanced'));
+		$form->addElement('text', 'display_callback', __('Value display function'), array('maxlength'=>255, 'style'=>'width:300px', 'id'=>'display_callback'));
+		$form->addElement('text', 'QFfield_callback', __('Field generator function'), array('maxlength'=>255, 'style'=>'width:300px', 'id'=>'QFfield_callback'));
+		
+        if ($action=='edit') {
+			if (!$row['extra']) $form->freeze('field');
+			$form->freeze('select_data_type');
+			$form->freeze('data_source');
+			$form->freeze('rset');
+		}
 		
 		if ($action=='edit') {
 			$display_callbacback = DB::GetOne('SELECT callback FROM '.$this->tab.'_callback WHERE freezed=1 AND field=%s', array($field));
@@ -2063,24 +2017,72 @@ class Utils_RecordBrowser extends Module {
             if (preg_match('/^[a-z0-9_]*$/',$new_id)==0) trigger_error('Invalid new column name: '.$data['field']);
 			$param = '';
 			switch ($data['select_data_type']) {
-				case 'text': if ($action=='add') $param = $data['text_length'];
-							 else $param = $row['param'];
-								break;
-				case 'commondata':
-							if ($data['select_type']=='select') {
-								$param = Utils_RecordBrowserCommon::encode_commondata_param(array('order_by_key'=>$data['order_by']=='key', 'array_id'=>$data['commondata_table']));
-							} else {
-								$param = '__COMMON__::'.$data['commondata_table'];
-								$data['select_data_type'] = 'multiselect';
-							}
-							if ($action!='add')
-								DB::Execute('UPDATE '.$this->tab.'_field SET param=%s WHERE field=%s', array($param, $field));
+                case 'autonumber':
+                    $data['required'] = false;
+                    $data['filter'] = false;
+                    $param = Utils_RecordBrowserCommon::encode_autonumber_param(
+                            $data['autonumber_prefix'],
+                            $data['autonumber_pad_length'],
+                            $data['autonumber_pad_mask']);
+                    // delete field and add again later to generate values
+                    if ($action != 'add') {
+                        Utils_RecordBrowserCommon::delete_record_field($this->tab, $field);
+                        $action = 'add';
+                        $field = $data['field'];
+                    }
+                    break;
+				case 'checkbox': 
+							$data['required'] = false;
 							break;
-				case 'multiselect':
-							if (isset($data['commondata_table'])) {
-								$param = '__COMMON__::'.$data['commondata_table'].'::'.$data['order_by'];
-								$data['select_data_type'] = 'multiselect';
-							} else $param = $row['param'];
+				case 'text': if ($action=='add') $param = $data['text_length'];
+							else {
+								if ($data['text_length']<$row['param']) trigger_error('Invalid field length', E_USER_ERROR);
+								$param = $data['text_length'];
+								if ($data['text_length']!=$row['param']) {
+									if(DATABASE_DRIVER=='postgres')
+										DB::Execute('ALTER TABLE '.$this->tab.'_data_1 ALTER COLUMN f_'.$id.' TYPE VARCHAR('.$param.')');
+									else
+										DB::Execute('ALTER TABLE '.$this->tab.'_data_1 MODIFY f_'.$id.' VARCHAR('.$param.')');
+								}
+							}
+							break;
+				case 'select':
+							if ($data['data_source']=='commondata') {
+								if ($data['select_type']=='select') {
+									$param = Utils_RecordBrowserCommon::encode_commondata_param(array('order_by_key'=>$data['order_by']=='key', 'array_id'=>$data['commondata_table']));
+									$data['select_data_type'] = 'commondata';
+								} else {
+									$param = '__COMMON__::'.$data['commondata_table'].'::'.$data['order_by'];
+									$data['select_data_type'] = 'multiselect';
+								}
+							} else {
+								$data['select_data_type'] = $data['select_type'];
+								if (!isset($row) || !isset($row['param'])) $row['param'] = ';::';
+								$props = explode(';', $row['param']);
+								$ret = $this->detranslate_field_names($data['rset'], $data['label_field']);
+								if (!empty($ret)) trigger_error('Invalid fields: '.$data['label_field']);
+								$props[0] = $data['rset'].'::'.implode('|', $data['label_field']);
+								$param = implode(';', $props);
+							}
+							if (isset($row) && isset($row['type']) && $row['type']=='multiselect' && $data['select_type']=='select') {
+								$ret = DB::Execute('SELECT id, f_'.$id.' AS v FROM '.$this->tab.'_data_1 WHERE f_'.$id.' IS NOT NULL');
+								while ($rr = $ret->FetchRow()) {
+									$v = Utils_RecordBrowserCommon::decode_multi($rr['v']);
+									$v = array_pop($v);
+									DB::Execute('UPDATE '.$this->tab.'_data_1 SET f_'.$id.'=%s WHERE id=%d', array($v, $rr['id']));
+								}
+							}
+							if (isset($row) && isset($row['type'])  && $row['type']!='multiselect' && $data['select_type']=='multiselect') {
+								if(DATABASE_DRIVER=='postgres')
+									DB::Execute('ALTER TABLE '.$this->tab.'_data_1 ALTER COLUMN f_'.$id.' TYPE TEXT');
+								else
+									DB::Execute('ALTER TABLE '.$this->tab.'_data_1 MODIFY f_'.$id.' TEXT');
+								$ret = DB::Execute('SELECT id, f_'.$id.' AS v FROM '.$this->tab.'_data_1 WHERE f_'.$id.' IS NOT NULL');
+								while ($rr = $ret->FetchRow()) {
+									$v = Utils_RecordBrowserCommon::encode_multi($rr['v']);
+									DB::Execute('UPDATE '.$this->tab.'_data_1 SET f_'.$id.'=%s WHERE id=%d', array($v, $rr['id']));
+								}
+							}
 							break;
 				default:	if (isset($row) && isset($row['param']))
 								$param = $row['param'];
@@ -2099,7 +2101,7 @@ class Utils_RecordBrowser extends Module {
             if(!isset($data['filter']) || $data['filter'] == '') $data['filter'] = 0;
 
             foreach($data as $key=>$val)
-                $data[$key] = htmlspecialchars($val);
+                if (is_string($val)) $data[$key] = htmlspecialchars($val);
 
             DB::StartTrans();
             if ($id!=$new_id) {
@@ -2128,12 +2130,83 @@ class Utils_RecordBrowser extends Module {
             $this->init(true, true);
             return false;
         }
-        $form->display();
+        $form->display_as_column();
+
+		eval_js('RB_hide_form_fields();');
+		eval_js('RB_advanced_confirmation = "'.Epesi::escapeJS(__('Changing these settings may often cause system unstability. Are you sure you want to see advanced settings?')).'";');
+		eval_js('RB_advanced_settings();');
+
 		Base_ActionBarCommon::add('save', __('Save'), $form->get_submit_form_href());
 		Base_ActionBarCommon::add('back', __('Cancel'), $this->create_back_href());
 		
         return true;
     }
+    
+    public static function qf_rule_without_double_underscore($str) {
+        return strpos($str, '__') === false;
+    }
+	
+	public function check_field_definitions($data) {
+		$ret = array();
+		
+		if ($this->admin_field_mode=='edit') 
+			$type = $this->admin_field_type;
+		else
+			$type = $data['select_data_type'];
+
+		if ($type == 'text') {
+			$last = $this->admin_field_name?DB::GetOne('SELECT param FROM '.$this->tab.'_field WHERE field=%s', array($this->admin_field_name)):1;
+			if ($data['text_length']<$last) $ret['text_length'] = __('Must be a number greater or equal %d', array($last));
+			if ($data['text_length']>255) $ret['text_length'] = __('Must be a number no greater than %d', array(255));
+			if (!is_numeric($data['text_length'])) $ret['text_length'] = __('Must be a number');
+			if ($data['text_length']=='') $ret['text_length'] = __('Field required');
+		}
+		if ($type == 'select') {
+			if (!isset($data['data_source'])) $data['data_source'] = $this->admin_field['data_source'];
+			if (!isset($data['rset'])) $data['rset'] = $this->admin_field['rset'];
+			if ($data['data_source']=='commondata' && $data['commondata_table']=='') $ret['commondata_table'] = __('Field required');
+			if ($data['data_source']=='rset') {
+				if ($data['label_field']=='') $ret['label_field'] = __('Field required');
+				else {
+					$rset = $data['rset'];
+					$ret = $ret + $this->detranslate_field_names($data['rset'], $data['label_field']);
+				}
+			}
+			if ($this->admin_field_mode=='edit' && $data['select_type']=='select' && $this->admin_field['select_type']=='multiselect') {
+				$count = DB::GetOne('SELECT COUNT(*) FROM '.$this->tab.'_data_1 WHERE f_'.Utils_RecordBrowserCommon::get_field_id($this->admin_field['field']).' '.DB::like().' %s', array('%_\_\__%'));
+				if ($count!=0) {
+					$ret['select_type'] = __('Cannot change type');
+					print('<span class="important_notice">'.__('Following records have more than one value stored in this field, making type change impossible:'));
+					$recs = DB::GetCol('SELECT id FROM '.$this->tab.'_data_1 WHERE f_'.Utils_RecordBrowserCommon::get_field_id($this->admin_field['field']).' '.DB::like().' %s', array('%_\_\__%'));
+					foreach ($recs as $r)
+						print('<br/>'.Utils_RecordBrowserCommon::create_default_linked_label($this->tab, $r, false, false));
+					print('</span>');
+				}
+			}
+		}
+		return empty($ret)?true:$ret;
+	}
+	
+	public function detranslate_field_names($rset, & $fs) {
+		Utils_RecordBrowserCommon::check_table_name($rset);
+		$fields = DB::GetAssoc('SELECT field, field FROM '.$rset.'_field WHERE type!=%s AND field!=%s AND type!=%s ORDER BY position', array('page_split', 'id', 'hidden'));
+		foreach ($fields as $k=>$f)
+			$fields[_V($f)] = $f; // ****** RecordBrowser - field name
+		
+		$fs = explode(',', $fs);
+		$ret = array();
+		foreach ($fs as $k=>$f) {
+			$f = trim($f);
+			if (isset($fields[$f]) && $f==$fields[$f]) continue;
+			if (isset($fields[$f])) {
+				$fs[$k] = $fields[$f];
+				continue;
+			}
+			$ret['label_field'] = __('Field not found: %s', array($f));
+		}
+		return $ret;
+	}
+	
     public function check_if_no_id($arg){
         return !preg_match('/^[iI][dD]$/',$arg);
     }
@@ -2146,7 +2219,7 @@ class Utils_RecordBrowser extends Module {
         return true;
     }
     public function dirty_read_changes($id, $time_from) {
-        print('<b>'.__('The following changes were applied to this record while you were editing it.<br>Please revise this data and make sure to keep this record most accurate.').'</b><br>');
+        print('<b>'.__('The following changes were applied to this record while you were editing it.').'<br/>'.__('Please revise this data and make sure to keep this record most accurate.').'</b><br>');
         $gb_cha = $this->init_module('Utils/GenericBrowser', null, $this->tab.'__changes');
         $table_columns_changes = array( array('name'=>__('Date'), 'width'=>10, 'wrapmode'=>'nowrap'),
                                         array('name'=>__('Username'), 'width'=>10, 'wrapmode'=>'nowrap'),
@@ -2445,13 +2518,15 @@ class Utils_RecordBrowser extends Module {
 
     public function enable_quick_new_records($button = true, $force_show = null) {
         $this->add_in_table = true;
-        if ($button) $this->add_button = 'href="javascript:void(0);" onclick="$(\'add_in_table_row\').style.display=($(\'add_in_table_row\').style.display==\'none\'?\'\':\'none\');if(focus_on_field)if($(focus_on_field))focus_by_id(focus_on_field);"';
+		$href = 'href="javascript:void(0);" onclick="$(\'add_in_table_row\').style.display=($(\'add_in_table_row\').style.display==\'none\'?\'\':\'none\');if(focus_on_field)if($(focus_on_field))focus_by_id(focus_on_field);"';
+        if ($button) $this->add_button = $href;
         if ($force_show===null) $this->show_add_in_table = Base_User_SettingsCommon::get('Utils_RecordBrowser','add_in_table_shown');
         else $this->show_add_in_table = $force_show;
         if ($this->get_module_variable('force_add_in_table_after_submit', false)) {
             $this->show_add_in_table = true;
             $this->set_module_variable('force_add_in_table_after_submit', false);
         }
+		return $href;
     }
 	
     public function set_custom_filter($arg, $spec){
@@ -2627,7 +2702,7 @@ class Utils_RecordBrowser extends Module {
 			$c_all_fields = count($all_fields);
 			$c_fields = count($fields[$row['id']]);
 
-			$props = ($c_all_fields-$c_fields)/$c_all_fields;
+			$props = $c_all_fields?($c_all_fields-$c_fields)/$c_all_fields:0;
 			$color = dechex(255-68*$props).dechex(187+68*$props).'BB';
 			$fields_value = ($c_all_fields-$c_fields).' / '.$c_all_fields;
 			if ($props!=1) $fields_value = Utils_TooltipCommon::create($fields_value, '<b>'.__('Excluded fields').':</b><hr>'.implode('<br>',$fields[$row['id']]), false);
@@ -2645,6 +2720,7 @@ class Utils_RecordBrowser extends Module {
 					$gb_row->add_data_array($vals);
 					if (Base_AdminCommon::get_access('Utils_RecordBrowser', 'permissions')==2) {
 						$gb_row->add_action($this->create_callback_href(array($this, 'edit_permissions_rule'), array($id)), 'edit', 'Edit');
+						$gb_row->add_action($this->create_callback_href(array($this, 'edit_permissions_rule'), array($id, true)), 'copy', __('Clone rule'), Base_ThemeCommon::get_template_file('Utils/Attachment','copy_small.png'));
 						$gb_row->add_action($this->create_confirm_callback_href(__('Are you sure you want to delete this rule?'), array($this, 'delete_permissions_rule'), array($id)), 'delete', 'Delete');
 				}
 		}
@@ -2659,7 +2735,7 @@ class Utils_RecordBrowser extends Module {
 		return false;
 	}
 	
-	public function edit_permissions_rule($id = null) {
+	public function edit_permissions_rule($id = null, $clone = false) {
 		if (Base_AdminCommon::get_access('Utils_RecordBrowser', 'permissions')!=2) return false;
         if ($this->is_back()) {
             return false;
@@ -2856,7 +2932,7 @@ class Utils_RecordBrowser extends Module {
 				$blocked_fields[] = $k;
 			}
 			
-			if ($id===null)
+			if ($id===null || $clone)
 				Utils_RecordBrowserCommon::add_access($this->tab, $action, $clearance, $crits, $blocked_fields);
 			else
 				Utils_RecordBrowserCommon::update_access($this->tab, $id, $action, $clearance, $crits, $blocked_fields);

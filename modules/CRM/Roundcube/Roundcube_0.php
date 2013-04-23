@@ -38,7 +38,7 @@ class CRM_Roundcube extends Module {
         }
         $params = array('_autologin_id'=>$def['id'])+$params2;
 //        if($params2) $params['_url'] = http_build_query($params2);
-        print('<iframe style="border:0" border="0" src="modules/CRM/Roundcube/RC/index.php?'.http_build_query($params).'" width="100%" height="300px" id="rc_frame"></iframe>');
+        print('<div style="background:transparent url(images/loader-0.gif) no-repeat 50% 50%;"><iframe style="border:0" border="0" src="modules/CRM/Roundcube/RC/index.php?'.http_build_query($params).'" width="100%" height="300px" id="rc_frame"></iframe></div>');
         eval_js('var dim=document.viewport.getDimensions();var rc=$("rc_frame");rc.style.height=(Math.max(dim.height,document.documentElement.clientHeight)-130)+"px";');
     }
 
@@ -126,12 +126,12 @@ class CRM_Roundcube extends Module {
             }
             if($ok) {
         	$this->lp = $this->init_module('Utils_LeightboxPrompt');
-   			$this->lp->add_option('cancel', __('Cancel'), null, null);
+   			$this->lp->add_option('cancel', __('Cancel'), Base_ThemeCommon::get_template_file('Base_ActionBar', 'icons/back.png'), null);
         	$this->lp->add_option('paste', __('Paste'), Base_ThemeCommon::get_template_file($this->get_type(), 'copy.png'), null);
         	$content = '';
         	foreach($_SESSION['rc_mails_cp'] as $mid) {
             	$mail = Utils_RecordBrowserCommon::get_record('rc_mails',$mid);
-            	$content .= '<div style="text-align:left"><b>'.__('From:').'</b> <i>'.$mail['from'].'</i><br /><b>'.__('To:').'</b> <i>'.$mail['to'].'</i><br /><b>'.__('Subject:').'</b> <i>'.$mail['subject'].'</i><br />'.substr(strip_tags($mail['body'],'<br><hr>'),0,200).(strlen($mail['body'])>200?'...':'').'</div>';
+            	$content .= '<div style="text-align:left"><b>'.__('From').':</b> <i>'.$mail['from'].'</i><br /><b>'.__('To').':</b> <i>'.$mail['to'].'</i><br /><b>'.__('Subject').':</b> <i>'.$mail['subject'].'</i><br />'.substr(strip_tags($mail['body'],'<br><hr>'),0,200).(strlen($mail['body'])>200?'...':'').'</div>';
         	}
         	$this->display_module($this->lp, array(__('Paste e-mail'), array(), $content, false));
        		$vals = $this->lp->export_values();
@@ -152,13 +152,24 @@ class CRM_Roundcube extends Module {
                         'attachments'=>array('width'=>5)
         ));
         $rb->set_additional_actions_method(array($this, 'actions_for_mails'));
+
+        //set order by threads:
+        //1 - if there is reference sort by parent message date, else sort by this message date ("group" messages by "parent" date)
+        //2 - if there is reference sort by parent message id, else sort by "my" message_id
+//        $rb->force_order(array(':CASE WHEN f_references is null OR (SELECT rx.f_date FROM rc_mails_data_1 rx WHERE rx.active=1 AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' LIMIT 1) is null THEN f_date ELSE (SELECT rx.f_date FROM rc_mails_data_1 rx WHERE rx.active=1 AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' ORDER BY rx.f_date ASC LIMIT 1) END'=>'DESC',
+          $rb->force_order(array(':CASE WHEN f_references is null OR (SELECT rx.f_date FROM rc_mails_data_1 rx WHERE rx.active=1 AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' LIMIT 1) is null THEN (SELECT rx.f_date FROM rc_mails_data_1 rx WHERE rx.active=1 AND rx.f_references LIKE '.DB::Concat('\'%\'','r.f_message_id','\'%\'').' ORDER BY rx.f_date DESC LIMIT 1) ELSE (SELECT rx2.f_date FROM rc_mails_data_1 rx2 WHERE rx2.active=1 AND rx2.f_references LIKE '.DB::Concat('\'%\'','(SELECT rx.f_message_id FROM rc_mails_data_1 rx WHERE rx.active=1 AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' ORDER BY rx.f_date ASC LIMIT 1)','\'%\'').' ORDER BY rx2.f_date DESC LIMIT 1) END'=>'DESC',
+                    ':CASE WHEN f_references is null THEN f_message_id ELSE (SELECT rx.f_message_id FROM rc_mails_data_1 rx WHERE rx.f_references is null AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' ORDER BY rx.f_date ASC LIMIT 1) END'=>'DESC',
+                    ':CASE WHEN f_references is null OR (SELECT rx.f_date FROM rc_mails_data_1 rx WHERE rx.active=1 AND r.f_references LIKE '.DB::Concat('\'%\'','rx.f_message_id','\'%\'').' LIMIT 1) is null THEN 0 ELSE 1 END'=>'ASC',
+                    'date'=>'DESC'
+        ));
+
         $assoc_mail_ids = array();
         $assoc_tmp = Utils_RecordBrowserCommon::get_records('rc_mails_assoc',array('recordset'=>$rs,'record_id'=>$id),array('mail'));
         foreach($assoc_tmp as $m)
         $assoc_mail_ids[] = $m['mail'];
         if($rs=='contact') {
         	//$ids = DB::GetCol('SELECT id FROM rc_mails_data_1 WHERE f_employee=%d OR (f_recordset=%s AND f_object=%d)',array($id,$rs,$id));
-        	$this->display_module($rb, array(array('(employee'=>$id,'|contacts'=>array('P:'.$id),'|id'=>$assoc_mail_ids), array(), array('date'=>'DESC')), 'show_data');
+        	$this->display_module($rb, array(array('(employee'=>$id,'|contacts'=>array('P:'.$id),'|id'=>$assoc_mail_ids), array(), array()), 'show_data');
         } elseif($rs=='company') {
             $form = $this->init_module('Libs/QuickForm');
             $form->addElement('checkbox', 'include_related', __('Include related e-mails'), null, array('onchange'=>$form->get_submit_form_js()));
@@ -180,10 +191,12 @@ class CRM_Roundcube extends Module {
                 foreach ($conts as $c)
                     $customers[] = 'P:'.$c['id'];
             }
-        	$this->display_module($rb, array(array('(contacts'=>$customers,'|id'=>$assoc_mail_ids), array(), array('date'=>'DESC')), 'show_data');
+        	$this->display_module($rb, array(array('(contacts'=>$customers,'|id'=>$assoc_mail_ids), array(), array()), 'show_data');
         } else
-        $this->display_module($rb, array(array('id'=>$assoc_mail_ids), array(), array('date'=>'DESC')), 'show_data');
-        
+        $this->display_module($rb, array(array('id'=>$assoc_mail_ids), array(), array()), 'show_data');
+
+        Epesi::load_js('modules/CRM/Roundcube/utils.js');
+        eval_js('CRM_RC.create_msg_tree("'.escapeJS($rb->get_path().'|0content',true).'")');
     }
 
     public function paste($rs,$id) {
@@ -199,6 +212,8 @@ class CRM_Roundcube extends Module {
 
     public function actions_for_mails($r, $gb_row) {
         $gb_row->add_action($this->create_callback_href(array($this,'copy'),array($r['id'])),'copy',null,Base_ThemeCommon::get_template_file($this->get_type(),'copy_small.png'));
+        $gb_row->add_action('style="display:none;" href="javascript:void(0)" class="expand"','Expand', null, Base_ThemeCommon::get_template_file('Utils/GenericBrowser', 'expand.gif'), 5);
+        $gb_row->add_action('style="display:none;" href="javascript:void(0)" class="collapse"','Collapse', null, Base_ThemeCommon::get_template_file('Utils/GenericBrowser', 'collapse.gif'), 5);
     }
 
     public function copy($id) {

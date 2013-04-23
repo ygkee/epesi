@@ -7,49 +7,42 @@
 
 	    {$__link.my.open}
 		<div class="epesi_big_button">
-            {if $display_icon}
             <img src="{$theme_dir}/CRM/Filters/my.png" alt="" align="middle" border="0" width="32" height="32">
-            {/if}
-            {if $display_text}
-                <span>{$__link.my.text}</span>
-            {/if}
+			<span>{$__link.my.text}</span>
         </div>
 	    {$__link.my.close}
 
         </td>
 
-        <!-- ALL -->
-        <td>
+		{if isset($all)}
+			<!-- ALL -->
+			<td>
 
-	    {$__link.all.open}
-		<div class="epesi_big_button">
-            {if $display_icon}
-            <img src="{$theme_dir}/CRM/Filters/all.png" alt="" align="middle" border="0" width="32" height="32">
-            {/if}
-            {if $display_text}
-                <span>{$__link.all.text}</span>
-            {/if}
-        </div>
-	    {$__link.all.close}
+			{$__link.all.open}
+			<div class="epesi_big_button">
+				<img src="{$theme_dir}/CRM/Filters/all.png" alt="" align="middle" border="0" width="32" height="32">
+				<span>{$__link.all.text}</span>
+			</div>
+			{$__link.all.close}
 
-        </td>
+			</td>
+		{/if}
 
         <!-- MANAGE FILTERS -->
         <td>
 
 	    {$__link.manage.open}
 		<div class="epesi_big_button">
-            {if $display_icon}
             <img src="{$theme_dir}/CRM/Filters/manage.png" alt="" align="middle" border="0" width="32" height="32">
-            {/if}
-            {if $display_text}
-                <span>{$__link.manage.text}</span>
-            {/if}
+			<span>{$__link.manage.text}</span>
         </div>
 	    {$__link.manage.close}
 
         </td>
     </tr>
+</table>
+<table id="CRM_Filters" cellspacing="0" cellpadding="0">
+	<tr>
         <td colspan="3" style="text-align: center;">
 			{$contacts_open}
 				{$contacts_data.crm_filter_contact.label}&nbsp;<span class="filters-autoselect">{$contacts_data.crm_filter_contact.html}</span>&nbsp;<span class="child_button">{$contacts_data.submit.html}</span>

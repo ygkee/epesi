@@ -48,6 +48,10 @@ input, textarea, select {
 	border: 1px solid #B3B3B3;
 }
 
+textarea {
+	width:99%;
+}
+
 .red     { color: #993333; }
 .green   { color: #339933; }
 .blue    { color: #336699; }
@@ -69,7 +73,7 @@ input, textarea, select {
     border: none;
     text-align: center;
     vertical-align: middle;
-	
+
 	/* border radius */
 	-webkit-border-radius: 6px;
 	-moz-border-radius: 6px;
@@ -94,8 +98,9 @@ input, textarea, select {
 	/* end dark css3 green background gradient */
 }
 .button {
-	display: block;
-	width: 100px;
+	display: inline-block;
+	white-space: nowrap;
+	padding: 0 5px;
 }
 
 .child_button > input,
@@ -168,6 +173,12 @@ hr.line {
     width: 100%;
 }
 
+@media print {
+    #body_content {
+        padding-top: 0;
+    }
+}
+
 #main_content {
 	position: relative;
 	/* width: 100%; */
@@ -212,6 +223,11 @@ hr.line {
     display: none;
 }
 
+@media print {
+    #top_bar {
+        display: none;
+    }
+}
 /*** top_bar_1 ***/
 
 #top_bar #top_bar_1 {
@@ -1106,16 +1122,6 @@ hr.line {
 	min-height: 20px;
 }
 
-.epesi_data select {
-	margin-right: 2px;
-	height: 22px;
-    width: 98px;
-}
-.epesi_data select {
-	padding: 2px 0;
-}
-
-
 .epesi_data input[type='checkbox'] {
     width: 13px;
     height: 13px;
@@ -1130,6 +1136,7 @@ hr.line {
 .epesi_data select,
 .epesi_data textarea {
 	width: 97%;
+        min-width: 50px;
 	height: 14px;
     background-color: #FFFFF9;
     border: 0px;
@@ -1137,6 +1144,10 @@ hr.line {
 	-webkit-border-radius: 0 4px 4px 0;
 	-moz-border-radius: 0 4px 4px 0;
     border-radius: 0 4px 4px 0;
+}
+.epesi_data input[type=checkbox],
+.epesi_data input[type=radio] {
+        min-width: 10px;
 }
 .epesi_data textarea {
 	height: 63px;
@@ -1146,6 +1157,7 @@ hr.line {
 	padding: 0;
 	margin-left: 2px;
 	margin-top: 2px;
+	margin-right: 2px;
 }
 .epesi_data.static_field,
 .epesi_data input[disabled],
@@ -1336,4 +1348,12 @@ hr.line {
 	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#9c9c9c', endColorstr='#666666',GradientType=0 ); /* IE6-9 */
 	background: linear-gradient(top, #9c9c9c 0%,#858585 49%,#666666 51%,#939393 100%); /* W3C */
 	/* gray v1 css3 background gradient */
+}
+
+pre.wrap {
+    white-space: pre-wrap; /* css-3 */
+    white-space: -moz-pre-wrap !important; /* Mozilla, since 1999 */
+    white-space: -pre-wrap; /* Opera 4-6 */
+    white-space: -o-pre-wrap; /* Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
 }

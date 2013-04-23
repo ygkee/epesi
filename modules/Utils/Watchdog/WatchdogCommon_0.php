@@ -234,7 +234,7 @@ class Utils_WatchdogCommon extends ModuleCommon {
 		return self::user_get_confirm_change_subscr_href(Acl::get_user(), $category_name, $id);
 	}
 	public static function add_actionbar_change_subscription_button($category_name, $id=null) {
-		return; // function disabled
+		if (!Base_AclCommon::check_permission('Watchdog - subscribe to categories')) return;
 		$category_id = self::get_category_id($category_name);
 		if (!$category_id) return;
 		$href = self::get_change_subscr_href($category_name, $id);
@@ -297,7 +297,7 @@ class Utils_WatchdogCommon extends ModuleCommon {
 			if (!is_array($changes)) $changes = array();
 			$data = call_user_func($methods[$v['category_id']], $v['internal_id'], $changes, false);
 			if ($data==null) continue;
-			$ret['watchdog_'.$v['internal_id'].'_'.$v['category_id'].'_'.$v['last_seen_event']] = '<b>'.__('Watchdog - %s:', array($data['category'])).'</b> '.$data['title'];
+			$ret['watchdog_'.$v['internal_id'].'_'.$v['category_id'].'_'.$v['last_seen_event']] = '<b>'.__('Watchdog - %s', array($data['category'])).':</b> '.$data['title'];
 			if (isset($data['events']) && $data['events'])
 				$ret['watchdog_'.$v['internal_id'].'_'.$v['category_id'].'_'.$v['last_seen_event']] .= '<br><font size=-5 color=gray>'.$data['events'].'</font>';
 		}

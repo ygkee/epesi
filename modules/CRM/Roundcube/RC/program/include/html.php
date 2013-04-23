@@ -5,8 +5,11 @@
  | program/include/html.php                                              |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2005-2010, Roundcube Dev, - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2005-2011, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Helper class to create valid XHTML code                             |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: html.php 4216 2010-11-12 10:47:04Z alec $
+ $Id$
 
  */
 
@@ -32,6 +35,7 @@ class html
     protected $allowed = array();
     protected $content;
 
+    public static $doctype = 'xhtml';
     public static $lc_tags = true;
     public static $common_attrib = array('id','class','style','title','align');
     public static $containers = array('iframe','div','span','p','h1','h2','h3','form','textarea','table','thead','tbody','tr','th','td','style','script');
@@ -71,18 +75,41 @@ class html
      */
     public static function tag($tagname, $attrib = array(), $content = null, $allowed_attrib = null)
     {
+        if (is_string($attrib))
+            $attrib = array('class' => $attrib);
+
         $inline_tags = array('a','span','img');
         $suffix = $attrib['nl'] || ($content && $attrib['nl'] !== false && !in_array($tagname, $inline_tags)) ? "\n" : '';
 
         $tagname = self::$lc_tags ? strtolower($tagname) : $tagname;
         if (isset($content) || in_array($tagname, self::$containers)) {
-            $templ = $attrib['noclose'] ? "<%s%s>%s" : "<%s%s>%s</%s>%s";
-            unset($attrib['noclose']);
-            return sprintf($templ, $tagname, self::attrib_string($attrib, $allowed_attrib), $content, $tagname, $suffix);
+            $suffix = $attrib['noclose'] ? $suffix : '</' . $tagname . '>' . $suffix;
+            unset($attrib['noclose'], $attrib['nl']);
+            return '<' . $tagname  . self::attrib_string($attrib, $allowed_attrib) . '>' . $content . $suffix;
         }
         else {
-            return sprintf("<%s%s />%s", $tagname, self::attrib_string($attrib, $allowed_attrib), $suffix);
+            return '<' . $tagname  . self::attrib_string($attrib, $allowed_attrib) . '>' . $suffix;
         }
+    }
+
+    /**
+     *
+     */
+    public static function doctype($type)
+    {
+        $doctypes = array(
+            'html5'        => '<!DOCTYPE html>',
+            'xhtml'        => '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+            'xhtml-trans'  => '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+            'xhtml-strict' => '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+        );
+
+        if ($doctypes[$type]) {
+            self::$doctype = preg_replace('/-\w+$/', '', $type);
+            return $doctypes[$type];
+        }
+
+        return '';
     }
 
     /**
@@ -130,7 +157,7 @@ class html
             $attr = array('src' => $attr);
         }
         return self::tag('img', $attr + array('alt' => ''), null, array_merge(self::$common_attrib,
-	    array('src','alt','width','height','border','usemap')));
+	        array('src','alt','width','height','border','usemap','onclick')));
     }
 
     /**
@@ -147,7 +174,7 @@ class html
             $attr = array('href' => $attr);
         }
         return self::tag('a', $attr, $cont, array_merge(self::$common_attrib,
-	    array('href','target','name','onclick','onmouseover','onmouseout','onmousedown','onmouseup')));
+	    array('href','target','name','rel','onclick','onmouseover','onmouseout','onmousedown','onmouseup')));
     }
 
     /**
@@ -195,7 +222,31 @@ class html
             $attr = array('src' => $attr);
         }
         return self::tag('iframe', $attr, $cont, array_merge(self::$common_attrib,
-	    array('src','name','width','height','border','frameborder')));
+            array('src','name','width','height','border','frameborder')));
+    }
+
+    /**
+     * Derrived method to create <script> tags
+     *
+     * @param mixed $attr Hash array with tag attributes or string with script source (src)
+     * @param string $cont Javascript code to be placed as tag content
+     * @return string HTML code
+     * @see html::tag()
+     */
+    public static function script($attr, $cont = null)
+    {
+        if (is_string($attr)) {
+            $attr = array('src' => $attr);
+        }
+        if ($cont) {
+            if (self::$doctype == 'xhtml')
+                $cont = "\n/* <![CDATA[ */\n" . $cont . "\n/* ]]> */\n";
+            else
+                $cont = "\n" . $cont . "\n";
+        }
+
+        return self::tag('script', $attr + array('type' => 'text/javascript', 'nl' => true),
+            $cont, array_merge(self::$common_attrib, array('src','type','charset')));
     }
 
     /**
@@ -243,14 +294,14 @@ class html
             // attributes with no value
             if (in_array($key, array('checked', 'multiple', 'disabled', 'selected'))) {
                 if ($value) {
-                    $attrib_arr[] = sprintf('%s="%s"', $key, $key);
+                    $attrib_arr[] = $key . '="' . $key . '"';
                 }
             }
             else if ($key=='value') {
-                $attrib_arr[] = sprintf('%s="%s"', $key, Q($value, 'strict', false));
+                $attrib_arr[] = $key . '="' . Q($value, 'strict', false) . '"';
             }
             else {
-                $attrib_arr[] = sprintf('%s="%s"', $key, Q($value));
+                $attrib_arr[] = $key . '="' . htmlspecialchars($value, ENT_COMPAT, RCMAIL_CHARSET) . '"';
             }
         }
         return count($attrib_arr) ? ' '.implode(' ', $attrib_arr) : '';
@@ -266,9 +317,10 @@ class html_inputfield extends html
 {
     protected $tagname = 'input';
     protected $type = 'text';
-    protected $allowed = array('type','name','value','size','tabindex',
-	'autocomplete','checked','onchange','onclick','disabled','readonly',
-	'spellcheck','results','maxlength','src');
+    protected $allowed = array(
+        'type','name','value','size','tabindex','autocapitalize',
+        'autocomplete','checked','onchange','onclick','disabled','readonly',
+        'spellcheck','results','maxlength','src','multiple','placeholder');
 
     /**
      * Object constructor
@@ -283,10 +335,6 @@ class html_inputfield extends html
 
         if ($attrib['type']) {
             $this->type = $attrib['type'];
-        }
-
-        if ($attrib['newline']) {
-            $this->newline = true;
         }
     }
 
@@ -330,11 +378,12 @@ class html_passwordfield extends html_inputfield
  * @package HTML
  */
 
-class html_hiddenfield extends html_inputfield
+class html_hiddenfield extends html
 {
+    protected $tagname = 'input';
     protected $type = 'hidden';
     protected $fields_arr = array();
-    protected $newline = true;
+    protected $allowed = array('type','name','value','onchange','disabled','readonly');
 
     /**
      * Constructor
@@ -501,7 +550,7 @@ class html_select extends html
     protected $tagname = 'select';
     protected $options = array();
     protected $allowed = array('name','size','tabindex','autocomplete',
-	'multiple','onchange','disabled');
+	'multiple','onchange','disabled','rel');
     
     /**
      * Add a new option to this drop-down
@@ -520,7 +569,6 @@ class html_select extends html
             $this->options[] = array('text' => $names, 'value' => $values);
         }
     }
-
 
     /**
      * Get HTML code for this object
@@ -560,7 +608,7 @@ class html_table extends html
 {
     protected $tagname = 'table';
     protected $allowed = array('id','class','style','width','summary',
-	'cellpadding','cellspacing','border');
+	    'cellpadding','cellspacing','border');
 
     private $header = array();
     private $rows = array();
@@ -574,7 +622,8 @@ class html_table extends html
      */
     public function __construct($attrib = array())
     {
-        $this->attrib = array_merge($attrib, array('summary' => '', 'border' => 0));
+        $default_attrib = self::$doctype == 'xhtml' ? array('summary' => '', 'border' => 0) : array();
+        $this->attrib = array_merge($attrib, $default_attrib);
     }
 
     /**
@@ -594,9 +643,9 @@ class html_table extends html
         $cell->content = $cont;
 
         $this->rows[$this->rowindex]->cells[$this->colindex] = $cell;
-        $this->colindex++;
+        $this->colindex += max(1, intval($attr['colspan']));
 
-        if ($this->attrib['cols'] && $this->colindex == $this->attrib['cols']) {
+        if ($this->attrib['cols'] && $this->colindex >= $this->attrib['cols']) {
             $this->add_row();
         }
     }
@@ -627,24 +676,23 @@ class html_table extends html
     public function remove_column($class)
     {
         // Remove the header
-        foreach($this->header as $index=>$header){
-            if($header->attrib['class'] == $class){
+        foreach ($this->header as $index=>$header){
+            if ($header->attrib['class'] == $class){
                 unset($this->header[$index]);
                 break;
             }
         }
 
         // Remove cells from rows
-        foreach($this->rows as $i=>$row){
-            foreach($row->cells as $j=>$cell){
-                if($cell->attrib['class'] == $class){
+        foreach ($this->rows as $i=>$row){
+            foreach ($row->cells as $j=>$cell){
+                if ($cell->attrib['class'] == $class){
                     unset($this->rows[$i]->cells[$j]);
                     break;
                 }
             }
         }
     }
-
 
     /**
      * Jump to next row
@@ -661,16 +709,35 @@ class html_table extends html
     }
 
     /**
-     * Set current row attrib
+     * Set row attributes
      *
-     * @param array $attr Row attributes
+     * @param array $attr  Row attributes
+     * @param int   $index Optional row index (default current row index)
      */
-    public function set_row_attribs($attr = array())
+    public function set_row_attribs($attr = array(), $index = null)
     {
         if (is_string($attr))
     	    $attr = array('class' => $attr);
 
-        $this->rows[$this->rowindex]->attrib = $attr;
+        if ($index === null)
+            $index = $this->rowindex;
+
+        $this->rows[$index]->attrib = $attr;
+    }
+
+    /**
+     * Get row attributes
+     *
+     * @param int $index Row index
+     *
+     * @return array Row attributes
+     */
+    public function get_row_attribs($index = null)
+    {
+        if ($index === null)
+            $index = $this->rowindex;
+
+        return $this->rows[$index] ? $this->rows[$index]->attrib : null;
     }
 
     /**
@@ -683,7 +750,7 @@ class html_table extends html
     {
         if (is_array($attrib))
             $this->attrib = array_merge($this->attrib, $attrib);
-        
+
         $thead = $tbody = "";
 
         // include <thead>
@@ -692,7 +759,7 @@ class html_table extends html
             foreach ($this->header as $c => $col) {
                 $rowcontent .= self::tag('td', $col->attrib, $col->content);
             }
-            $thead = self::tag('thead', null, self::tag('tr', null, $rowcontent));
+            $thead = self::tag('thead', null, self::tag('tr', null, $rowcontent, parent::$common_attrib));
         }
 
         foreach ($this->rows as $r => $row) {
@@ -702,7 +769,7 @@ class html_table extends html
             }
 
             if ($r < $this->rowindex || count($row->cells)) {
-                $tbody .= self::tag('tr', $row->attrib, $rowcontent);
+                $tbody .= self::tag('tr', $row->attrib, $rowcontent, parent::$common_attrib);
             }
         }
 
@@ -716,7 +783,7 @@ class html_table extends html
         unset($this->attrib['cols'], $this->attrib['rowsonly']);
         return parent::show();
     }
-    
+
     /**
      * Count number of rows
      *
@@ -726,5 +793,15 @@ class html_table extends html
     {
       return count($this->rows);
     }
+
+    /**
+     * Remove table body (all rows)
+     */
+    public function remove_body()
+    {
+        $this->rows     = array();
+        $this->rowindex = 0;
+    }
+
 }
 

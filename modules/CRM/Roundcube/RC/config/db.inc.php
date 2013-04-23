@@ -38,34 +38,24 @@ $rcmail_config['db_persistent'] = FALSE;
 
 // you can define specific table names used to store webmail data
 $rcmail_config['db_table_users'] = 'rc_users';
-
 $rcmail_config['db_table_identities'] = 'rc_identities';
-
 $rcmail_config['db_table_contacts'] = 'rc_contacts';
-
 $rcmail_config['db_table_contactgroups'] = 'rc_contactgroups';
-
 $rcmail_config['db_table_contactgroupmembers'] = 'rc_contactgroupmembers';
-
 $rcmail_config['db_table_session'] = 'rc_session';
-
 $rcmail_config['db_table_cache'] = 'rc_cache';
-
-$rcmail_config['db_table_messages'] = 'rc_messages';
-
+$rcmail_config['db_table_cache_index'] = 'rc_cache_index';
+$rcmail_config['db_table_cache_thread'] = 'rc_cache_thread';
+$rcmail_config['db_table_cache_messages'] = 'rc_cache_messages';
+$rcmail_config['db_table_searches'] = 'rc_searches';
 
 // you can define specific sequence names used in PostgreSQL
 $rcmail_config['db_sequence_users'] = 'rc_user_ids';
-
 $rcmail_config['db_sequence_identities'] = 'rc_identity_ids';
-
 $rcmail_config['db_sequence_contacts'] = 'rc_contact_ids';
-
 $rcmail_config['db_sequence_contactgroups'] = 'rc_contactgroups_ids';
-
 $rcmail_config['db_sequence_cache'] = 'rc_cache_ids';
-
-$rcmail_config['db_sequence_messages'] = 'rc_message_ids';
+$rcmail_config['db_sequence_searches'] = 'rc_search_ids';
 
 
 // end db config file

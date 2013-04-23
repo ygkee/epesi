@@ -5,8 +5,11 @@
  | program/include/rcube_config.php                                      |
  |                                                                       |
  | This file is part of the Roundcube Webmail client                     |
- | Copyright (C) 2008-2010, Roundcube Dev. - Switzerland                 |
- | Licensed under the GNU GPL                                            |
+ | Copyright (C) 2008-2012, The Roundcube Dev Team                       |
+ |                                                                       |
+ | Licensed under the GNU General Public License version 3 or            |
+ | any later version with exceptions for skins & plugins.                |
+ | See the README file for a full license statement.                     |
  |                                                                       |
  | PURPOSE:                                                              |
  |   Class to read configuration settings                                |
@@ -15,7 +18,7 @@
  | Author: Thomas Bruederli <roundcube@gmail.com>                        |
  +-----------------------------------------------------------------------+
 
- $Id: rcube_config.php 4509 2011-02-09 10:51:50Z thomasb $
+ $Id$
 
 */
 
@@ -26,9 +29,23 @@
  */
 class rcube_config
 {
+    const DEFAULT_SKIN = 'larry';
+
     private $prop = array();
     private $errors = array();
     private $userprefs = array();
+
+    /**
+     * Renamed options
+     *
+     * @var array
+     */
+    private $legacy_props = array(
+        // new name => old name
+        'default_folders'      => 'default_imap_folders',
+        'mail_pagesize'        => 'pagesize',
+        'addressbook_pagesize' => 'pagesize',
+    );
 
 
     /**
@@ -54,27 +71,32 @@ class rcube_config
         // load database config
         if (!$this->load_from_file(RCMAIL_CONFIG_DIR . '/db.inc.php'))
             $this->errors[] = 'db.inc.php was not found.';
-    
+
         // load host-specific configuration
         $this->load_host_config();
 
         // set skin (with fallback to old 'skin_path' property)
+
         if (empty($this->prop['skin']) && !empty($this->prop['skin_path']))
             $this->prop['skin'] = str_replace('skins/', '', unslashify($this->prop['skin_path']));
         else if (empty($this->prop['skin']))
-            $this->prop['skin'] = 'default';
+            $this->prop['skin'] = self::DEFAULT_SKIN;
+
+        // larry is the new default skin :-)
+        if ($this->prop['skin'] == 'default')
+            $this->prop['skin'] = self::DEFAULT_SKIN;
 
         // fix paths
         $this->prop['log_dir'] = $this->prop['log_dir'] ? realpath(unslashify($this->prop['log_dir'])) : INSTALL_PATH . 'logs';
         $this->prop['temp_dir'] = $this->prop['temp_dir'] ? realpath(unslashify($this->prop['temp_dir'])) : INSTALL_PATH . 'temp';
-    
+
         // fix default imap folders encoding
         foreach (array('drafts_mbox', 'junk_mbox', 'sent_mbox', 'trash_mbox') as $folder)
             $this->prop[$folder] = rcube_charset_convert($this->prop[$folder], RCMAIL_CHARSET, 'UTF7-IMAP');
 
-        if (!empty($this->prop['default_imap_folders']))
-            foreach ($this->prop['default_imap_folders'] as $n => $folder)
-                $this->prop['default_imap_folders'][$n] = rcube_charset_convert($folder, RCMAIL_CHARSET, 'UTF7-IMAP');
+        if (!empty($this->prop['default_folders']))
+            foreach ($this->prop['default_folders'] as $n => $folder)
+                $this->prop['default_folders'][$n] = rcube_charset_convert($folder, RCMAIL_CHARSET, 'UTF7-IMAP');
 
         // set PHP error logging according to config
         if ($this->prop['debug_level'] & 1) {
@@ -87,12 +109,20 @@ class rcube_config
                 ini_set('error_log', $this->prop['log_dir'].'/errors');
             }
         }
-        if ($this->prop['debug_level'] & 4) {
-            ini_set('display_errors', 1);
+
+        // enable display_errors in 'show' level, but not for ajax requests
+        ini_set('display_errors', intval(empty($_REQUEST['_remote']) && ($this->prop['debug_level'] & 4)));
+
+        // set timezone auto settings values
+        if ($this->prop['timezone'] == 'auto') {
+          $this->prop['_timezone_value'] = $this->client_timezone();
         }
-        else {
-            ini_set('display_errors', 0);
+        else if (is_numeric($this->prop['timezone'])) {
+          $this->prop['timezone'] = timezone_name_from_abbr("", $this->prop['timezone'] * 3600, 0);
         }
+
+        // remove deprecated properties
+        unset($this->prop['dst_active']);
 
         // export config data
         $GLOBALS['CONFIG'] = &$this->prop;
@@ -153,7 +183,29 @@ class rcube_config
      */
     public function get($name, $def = null)
     {
-        return isset($this->prop[$name]) ? $this->prop[$name] : $def;
+        if (isset($this->prop[$name])) {
+            $result = $this->prop[$name];
+        }
+        else if (isset($this->legacy_props[$name])) {
+            return $this->get($this->legacy_props[$name], $def);
+        }
+        else {
+            $result = $def;
+        }
+
+        $rcmail = rcmail::get_instance();
+
+        if ($name == 'timezone' && isset($this->prop['_timezone_value']))
+            $result = $this->prop['_timezone_value'];
+
+        if (is_object($rcmail->plugins)) {
+            $plugin = $rcmail->plugins->exec_hook('config_get', array(
+                'name' => $name, 'default' => $def, 'result' => $result));
+
+            return $plugin['result'];
+        }
+
+        return $result;
     }
 
 
@@ -188,8 +240,33 @@ class rcube_config
      */
     public function set_user_prefs($prefs)
     {
+        // Honor the dont_override setting for any existing user preferences
+        $dont_override = $this->get('dont_override');
+        if (is_array($dont_override) && !empty($dont_override)) {
+            foreach ($dont_override as $key) {
+                unset($prefs[$key]);
+            }
+        }
+
+        // convert user's timezone into the new format
+        if (is_numeric($prefs['timezone'])) {
+            $prefs['timezone'] = timezone_name_from_abbr('', $prefs['timezone'] * 3600, 0);
+        }
+
+        // larry is the new default skin :-)
+
+        if ($prefs['skin'] == 'default')
+            $prefs['skin'] = self::DEFAULT_SKIN;
+
         $this->userprefs = $prefs;
-        $this->prop = array_merge($this->prop, $prefs);
+        $this->prop      = array_merge($this->prop, $prefs);
+
+        // override timezone settings with client values
+        if ($this->prop['timezone'] == 'auto') {
+            $this->prop['_timezone_value'] = isset($_SESSION['timezone']) ? $this->client_timezone() : $this->prop['_timezone_value'];
+        }
+        else if (isset($this->prop['_timezone_value']))
+           unset($this->prop['_timezone_value']);
     }
 
 
@@ -203,6 +280,25 @@ class rcube_config
         return $this->prop;
     }
 
+    /**
+     * Special getter for user's timezone offset including DST
+     *
+     * @return float  Timezone offset (in hours)
+     * @deprecated
+     */
+    public function get_timezone()
+    {
+      if ($tz = $this->get('timezone')) {
+        try {
+          $tz = new DateTimeZone($tz);
+          return $tz->getOffset(new DateTime('now')) / 3600;
+        }
+        catch (Exception $e) {
+        }
+      }
+
+      return 0;
+    }
 
     /**
      * Return requested DES crypto key.
@@ -301,6 +397,15 @@ class rcube_config
     public function get_error()
     {
         return empty($this->errors) ? false : join("\n", $this->errors);
+    }
+
+
+    /**
+     * Internal getter for client's (browser) timezone identifier
+     */
+    private function client_timezone()
+    {
+        return isset($_SESSION['timezone']) ? timezone_name_from_abbr("", $_SESSION['timezone'] * 3600, 0) : date_default_timezone_get();
     }
 
 }

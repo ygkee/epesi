@@ -10,7 +10,7 @@ class SecureConnectionException extends Exception {
  * ClientRequester to perform Epesi Service Server clients requests.
  * @author Adam Bukowski <abukowski@telaxus.com>
  * @copyright Copyright &copy; 2011, Telaxus LLC
- * @version 20111121
+ * @version 20121231
  */
 class ClientRequester implements IClient {
 
@@ -139,7 +139,8 @@ class ClientRequester implements IClient {
             IClient::param_client_version => IClient::client_version,
             IClient::param_serialize => $serialize_response,
             IClient::param_arguments => serialize($params),
-            IClient::param_lang => Base_LangCommon::get_lang_code()
+            IClient::param_lang => Base_LangCommon::get_lang_code(),
+            IClient::param_epesi_version => EPESI_VERSION
         );
     }
 
@@ -189,7 +190,8 @@ class ClientRequester implements IClient {
             throw new SecureConnectionException("Your server doesn't support ssl connection. Please load extension 'openssl.'");
 
         $http['method'] = 'POST';
-        $http['header'] = 'Content-Type: application/x-www-form-urlencoded';
+        $http['header'] = "Content-Type: application/x-www-form-urlencoded\r\n" 
+                        . "Referer: " . self::get_referer();
         $http['content'] = $post_data;
 
         set_error_handler(create_function('$code, $message', 'throw new ErrorException($message);'));
@@ -219,6 +221,7 @@ class ClientRequester implements IClient {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_setopt($ch, CURLOPT_REFERER, self::get_referer());
 
         $output = curl_exec($ch);
         $errno = curl_error($ch);
@@ -235,6 +238,14 @@ class ClientRequester implements IClient {
             throw new ErrorException("Authentication failed!");
         }
         return $output;
+    }
+    
+    private static function get_referer() {
+        $referer = $_SERVER['HTTP_REFERER'];
+        if (!$referer)
+            $referer = ($_SERVER['HTTPS'] ? 'https://' : 'http://')
+                    . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        return $referer;
     }
     
     static function get_log() {

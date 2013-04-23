@@ -16,6 +16,7 @@ class Base_Dashboard extends Module {
 
 	public function construct() {
 		$this->tb = $this->init_module('Utils/TabbedBrowser');
+        on_init(array('Base_ActionBarCommon', 'show_quick_access_shortcuts'), array(false));
 	}
 
 	public function body() {
@@ -26,6 +27,7 @@ class Base_Dashboard extends Module {
 			if(Utils_RecordBrowserCommon::check_for_jump()) return;
 
 		$this->dashboard();
+        Base_ActionBarCommon::show_quick_access_shortcuts(true);
 	}
 	
 	private function dashboard() {
@@ -82,6 +84,7 @@ class Base_Dashboard extends Module {
 
 		if ($config_mode)
 			print('<table style="width:100%;"><tr><td style="width:75%;vertical-align:top;">');
+		$init_tabs_js = array();
 		if(count($tabs)>1 || $config_mode) {
 			foreach($tabs as $tab) {
 				$label = $tab['name'];
@@ -96,6 +99,7 @@ class Base_Dashboard extends Module {
 					$label .= '<a '.$this->create_confirm_callback_href(__('Delete this tab and all applets assigned to it?'),array($this,'delete_tab'),$tab['id']).'><img src="'.Base_ThemeCommon::get_template_file('/Base/Dashboard','close.png').'" onMouseOver="this.src=\''.Base_ThemeCommon::get_template_file('/Base/Dashboard','close-hover.png').'\';" onMouseOut="this.src=\''.Base_ThemeCommon::get_template_file('/Base/Dashboard','close.png').'\';" width="14" height="14" alt="<" border="0"></a>';
 				}
 				$this->tb->set_tab($label, array($this,'display_dashboard'),$tab['id'], $config_mode, $buttons);
+				$init_tabs_js[] = $tab['id'];
 			}
 			if ($config_mode) {
 				// *** New tab button ****
@@ -118,8 +122,10 @@ class Base_Dashboard extends Module {
 
 			$this->display_module($this->tb);
 			$this->tb->tag();
-		} else
+		} else {
 			$this->display_dashboard($tabs[0]['id']);
+			$init_tabs_js[] = $tabs[0]['id'];
+		}
 		if ($config_mode) {
 			print('</td>');
 			print('<td id="dashboard" style="vertical-align:top;">');
@@ -135,6 +141,7 @@ class Base_Dashboard extends Module {
 			print('</td></tr></table>');
 			eval_js('var dim=document.viewport.getDimensions();var dct=$("dashboard_applets_new_scroll");dct.style.height=(Math.max(dim.height,document.documentElement.clientHeight)-150)+"px";');
 		}
+		eval_js('dashboard_activate('.json_encode($init_tabs_js).','.($default_dash?1:0).')');
 	}
 	
 	public function switch_config_mode() {
@@ -218,7 +225,6 @@ class Base_Dashboard extends Module {
 			print('</div>');
 		}
 		print('</div>');
-		eval_js('dashboard_activate('.$tab_id.','.($default_dash?1:0).')');
 	}
 
 	public function delete_tab($id) {
@@ -232,6 +238,8 @@ class Base_Dashboard extends Module {
 			DB::Execute('DELETE FROM '.$table_settings.' WHERE applet_id=%d',array($row['id']));
 		DB::Execute('DELETE FROM '.$table_applets.' WHERE tab=%d',array($id));
 		DB::Execute('DELETE FROM '.$table_tabs.' WHERE id=%d',array($id));
+
+		$this->tb->switch_tab(0);
 	}
 
 	public function move_tab($id,$old_pos,$dir) {

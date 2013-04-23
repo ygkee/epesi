@@ -126,11 +126,13 @@ class Base_User_Administrator extends Module implements Base_AdminInterface {
     } 
 
     public function admin() {
-		if (ModuleManager::is_installed('CRM_Contacts')>=0) {
-			$this->pack_module('CRM_Contacts', array(), 'user_admin');
-			return;
-		}
-		if($this->is_back()) {
+		if (ModuleManager::is_installed('CRM_Contacts') >= 0) {
+            $this->pack_module('CRM_Contacts', array(), 'user_admin');
+
+            $this->banning_form();
+            return;
+        }
+        if($this->is_back()) {
 			if($this->parent->get_type()=='Base_Admin')
 				$this->parent->reset();
 			else
@@ -191,15 +193,28 @@ class Base_User_Administrator extends Module implements Base_AdminInterface {
 
         $this->display_module($gb);
 
-        $qf = $this->init_module('Libs/QuickForm',null,'ban');
-        $qf->addElement('select','bantime',__('Ban time after 3 failed logins'),array(0=>__('Disabled'),10=>__('10 seconds'),30=>__('30 seconds'),60=>__('1 minute'),180=>__('3 minutes'),300=>__('5 minutes'),900=>__('15 minutes'),1800=>__('30 minutes'),3600=>__('1 hour'),(3600*6)=>__('6 hours'),(3600*24)=>__('1 day')),array('onChange'=>$qf->get_submit_form_js()));
-        $qf->setDefaults(array('bantime'=>Variable::get('host_ban_time')));
-        if($qf->validate()) {
-            Variable::set('host_ban_time',$qf->exportValue('bantime'));
-        }
-        $qf->display();
-//      print('<a '.$this->create_unique_href(array('edit_user'=>-1)).'>'.__('Add new user').'</a>');
+        $this->banning_form();
+
         Base_ActionBarCommon::add('add',__('New user'),$this->create_callback_href(array($this,'edit_user_form'), array(-1)));
+    }
+    
+    private function banning_form() {
+        $qf = $this->init_module('Libs/QuickForm', null, 'ban');
+        $qf->addElement('select', 'bantype', __('Ban by'), array("0" => __('IP Address'), "1" => "User login from specific IP address"), array('onChange' => $qf->get_submit_form_js()));
+        $qf->addElement('select', 'bantries', __('Number of failed logins to ban'), array(0 => __('Disable ban'), 1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 5, 10 => 10), array('onChange' => $qf->get_submit_form_js()));
+        $qf->addElement('select', 'bantime', __('Ban time after  failed logins'), array(10 => __('10 seconds'), 30 => __('30 seconds'), 60 => __('1 minute'), 180 => __('3 minutes'), 300 => __('5 minutes'), 900 => __('15 minutes'), 1800 => __('30 minutes'), 3600 => __('1 hour'), (3600 * 6) => __('6 hours'), (3600 * 24) => __('1 day')), array('onChange' => $qf->get_submit_form_js()));
+        $qf->setDefaults(array('bantype' => Variable::get('host_ban_by_login', false),
+            'bantries' => Variable::get('host_ban_nr_of_tries'),
+            'bantime' => Variable::get('host_ban_time')));
+        if ($qf->validate()) {
+            $values = $qf->exportValues();
+            Variable::set('host_ban_by_login', $values['bantype']);
+            Variable::set('host_ban_nr_of_tries', $values['bantries']);
+            Variable::set('host_ban_time', $values['bantime']);
+        }
+        if (Variable::get('host_ban_nr_of_tries') == 0)
+            $qf->getElement('bantime')->setAttribute('disabled', 'disabled');
+        $qf->display_as_row();
     }
 
     public function log_as_user($id) {
@@ -234,7 +249,7 @@ class Base_User_Administrator extends Module implements Base_AdminInterface {
         $form->addElement('select', 'admin', __('Administrator'), array(0=>__('No'), 1=>__('Administrator'), 2=>__('Super Administrator')));
 
         if($edit_id<0)
-            $form -> addElement('html','<tr><td colspan=2><b>'.__('If you leave password fields empty<br />random password is automatically generated<br />and e-mailed to the user.').'</b></td></tr>');
+            $form -> addElement('html','<tr><td colspan=2><b>'.__('If you leave password fields empty random password is automatically generated and e-mailed to the user.').'</b></td></tr>');
             //$form->addElement('header',null,__('If you leave this fields empty, password is generated.'));
         else
             $form -> addElement('html','<tr><td colspan=2><b>'.__('If you leave password fields empty, password is not changed.').'</b></td></tr>');
