@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Epesi : EPESI Web Application Server" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Epesi</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/Telaxus/epesi">View on GitHub</a>
+
+          <h1 id="project_title">Epesi</h1>
+          <h2 id="project_tagline">EPESI Web Application Server</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/Telaxus/epesi/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/Telaxus/epesi/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>EPESI is a free and open source CRM PHP/Ajax Framework for rapid development of database driven ERP web applications</p>
+
+<p>Installation</p>
+
+<ol>
+<li>REQUIREMENTS</li>
+<li>CHOOSE INSTALLATION METHOD</li>
+<li>NEW INSTALLATION USING COMPRESSED FILE</li>
+<li>NEW INSTALLATION USING EASYINSTALL.PHP SCRIPT</li>
+<li>REINSTALLATION</li>
+<li>UPDATE</li>
+<li>SUPPORT</li>
+</ol><hr><ol>
+<li>
+<p>REQUIREMENTS</p>
+
+<ul>
+<li>HTTP web server (apache, IIS) with PHP 5.1.3 support. If possible install the latest PHP version due to several bugs in older versions.</li>
+<li>PHP 5.2.0 is not supported due to bug in json_decode function. (PHP &gt;= 5.2.1 works)</li>
+<li>HTTP server should be configured with index.php as one of default documents.</li>
+<li>HTTP server have to support local .htaccess files</li>
+<li>PEAR installed with valid include_path in PHP config.ini.</li>
+<li>MySQL 4+ or PostgreSQL 7+ database server.</li>
+<li>FTP or local/shell access to the server.</li>
+<li>A web browser (Chrome or Firefox recommended).</li>
+</ul>
+</li>
+<li>
+<p>CHOOSE INSTALLATION METHOD</p>
+
+<ul>
+<li>New installation or update. For update see Update section (6).</li>
+<li>Installation from compressed file via FTP or local access (shell etc.) - section 3.</li>
+<li>Easy installation using easyinstall script (preferred method) - section 4.</li>
+</ul>
+</li>
+<li>
+<p>NEW INSTALLATION USING COMPRESSED FILE</p>
+
+<ul>
+<li>Download the latest version of EPESI from <a href="http://sourceforge.net/projects/epesi/">http://sourceforge.net/projects/epesi/</a>
+</li>
+<li>Decompress all files and place them in the directory from which EPESI will be run. You will need to setup /data directory with read/write access.</li>
+<li>Create a database, note the username, password and database name. Make sure that the user has full rights to the database (read, write, create tables etc.)</li>
+<li>Point your browser to the location from which EPESI will be run, for example: <a href="http://www.yourcompany.com/epesi">http://www.yourcompany.com/epesi</a>
+</li>
+<li>EPESI setup should start automatically. Accept license agreement and the setup wizard will guide you through all steps which includes creation of the configuration file config.php, necessary directories within /data directory, tables, superadmin user account and password, default data and settings, etc.</li>
+<li>Finally the setup scans all available modules and you will be greeted with the default dashboard. The installation is complete.</li>
+<li>Create new users as new contacts and explore the application.</li>
+</ul>
+</li>
+<li>
+<p>NEW INSTALLATION USING EASYINSTALL.PHP SCRIPT</p>
+
+<ul>
+<li>Create a database, note the username, password and database name. Make sure that the user has full rights to the database (read, write, create tables etc.)</li>
+<li>Download the latest version of easyinstall script from <a href="http://sourceforge.net/projects/epesi/">http://sourceforge.net/projects/epesi/</a>
+</li>
+<li>Place the file in the directory from which EPESI will be run. Make sure that the directory has a read/write access. Start the script in a web browser.</li>
+<li>There is no need to download the entire EPESI application as a compressed file. This easy install script automatically connects to SourceForge server, downloads the latest version, verifies it, decompresses files on the server, sets proper directory permissions and starts EPESI setup.</li>
+<li>Accept license agreement and the setup wizard will guide you through all steps which includes creation of the configuration file config.php, necessary directories within data directory, tables, superadmin user account and password, default data and settings, etc.</li>
+<li>Finally the setup scans all available modules and you will be greeted with the default dashboard. The installation is complete.</li>
+<li>Create new users as new contacts and explore the application.</li>
+</ul>
+</li>
+<li>
+<p>REINSTALLATION</p>
+
+<ul>
+<li>By reinstallation we mean complete, new installation of the application without preserving any of the old data. </li>
+<li>Open config.php located in /data directory and note the database name, user and the password. You will need to enter the same data during the setup.</li>
+<li>Delete the entire content of /data directory with the exception of index.html file (which is needed for security reasons).</li>
+<li>Point your browser to the location from which EPESI was running, for example: <a href="http://www.yourcompany.com/epesi">http://www.yourcompany.com/epesi</a>
+</li>
+<li>During the setup follow instruction above as if it was a new installation.</li>
+</ul>
+</li>
+<li>
+<p>UPDATE</p>
+
+<ul>
+<li>Before updating the application backup the entire application directory and especially data directory.</li>
+<li>Backup the database.</li>
+<li>Download the new version of EPESI and overwrite all files.</li>
+<li>Point your browser to the location from which EPESI was running, for example: <a href="http://www.yourcompany.com/epesi">http://www.yourcompany.com/epesi</a>
+</li>
+<li>If the database schema did not change you will be already running new version.</li>
+<li>If the database schema did change the update process will start automatically during which tables will be altered to this new database schema.</li>
+<li>Once update process is complete you will be redirected automatically to the new version of EPESI application.</li>
+</ul>
+</li>
+<li><p>SUPPORT
+Any questions, comments and bug reports should be posted on our forum: <a href="http://forum.epesibim.com/">http://forum.epesibim.com/</a></p></li>
+</ol><p>Enjoy,
+EPESI Team</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Epesi maintained by <a href="https://github.com/Telaxus">Telaxus</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
