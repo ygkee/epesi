@@ -1,0 +1,19 @@
+
+
+
+EPESI
+
+
+EPESI is a web application server for building CRM/ERP applications. Its base consists of a CRM solution that allows to manage business information: store, organize and share records between people within company or organization. Thus it simplifies internal communication and makes workflow more efficient. It is built on top of a high level, fast and light PHP/Ajax framework which was specially created for that purpose.
+
+The standard features include CRM apps like shared calendar, tasks and address book, an integrated e-mail client Roundcube and unique solutions like advanced permission system, easy form filling (Click2Fill), record change tracking (Watchdog) and full record history.
+
+There are also many extension apps in EPESI offer that deal with more specific needs of different types of business activities. It is thanks to modular design that functionalities of the basic CRM applications can be easily modified and extended. Both free and paid apps can be obtained through EPESI Store. Example of apps: List Manager, Campaign Manager, Inventory Management System, E-Commerce.
+
+Moreover EPESI includes ideas about solving common business processes problems encountered at 400 real businesses and organization in Philadelphia, USA area over 10 years period. Though the apps available in EPESI Store are tested in a real life and they still can be customized to fit other needs.
+
+Since it is a web based application there is no installation required. Once setup it is ready to use, facilitating internal communication. There is no more need to use emails – all data is stored at one place, secure, organized and prioritized in a desired way.
+
+Summing up EPESI CRM allows to store data on servers in a very simple and accessible way, allowing to use the safety and security of advanced computer technologies. In one package with CRM there is a high level PHP framework delivered – a collection of libraries and modules that allow rapid development of new apps. It has a CRUD engine together with user management, lightboxes, forms, themes and more, all with support via forum.
+
+The project has been started in 2006 by Telaxus LLC and the estimated costs to developed it reached $8 mln USD. Though EPESI is open sourced and available for free under the MIT license.
