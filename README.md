@@ -1,7 +1,7 @@
-epesi
+<a href="epe.si">EPESI</a>
 =====
 
-EPESI is a web application server for building CRM/ERP applications. Its base consists of a CRM solution that allows to manage business information: store, organize and share records between people within company or organization. Thus it simplifies internal communication and makes workflow more efficient. It is built on top of a high level, fast and light PHP/Ajax framework which was specially created for that purpose.
+is a web application server for building CRM/ERP applications. Its base consists of a CRM solution that allows to manage business information: store, organize and share records between people within company or organization. Thus it simplifies internal communication and makes workflow more efficient. It is built on top of a high level, fast and light PHP/Ajax framework which was specially created for that purpose.
 
 The standard features include CRM apps like shared calendar, tasks and address book, an integrated e-mail client Roundcube and unique solutions like advanced permission system, easy form filling (Click2Fill), record change tracking (Watchdog) and full record history.
 
