@@ -354,7 +354,8 @@ class Utils_RecordBrowserCommon extends ModuleCommon {
 				self::$table_rows[$row['field']]['ref_table'] = substr($row['param'], 0, $pos);
 				if (self::$table_rows[$row['field']]['ref_table']=='__COMMON__') {
 					self::$table_rows[$row['field']]['ref_field'] = '__COMMON__';
-					self::$table_rows[$row['field']]['ref_table'] = substr($row['param'], $pos+2);
+                    $exploded = explode('::', $row['param']);
+					self::$table_rows[$row['field']]['ref_table'] = $exploded[1];
 					$commondata = true;
 				} else {
 				    $end = strpos($row['param'], ';', $pos+2);
@@ -1569,7 +1570,7 @@ class Utils_RecordBrowserCommon extends ModuleCommon {
 		foreach ($blocked_fields as $f)
 			DB::Execute('INSERT INTO '.$tab.'_access_fields (rule_id, block_field) VALUES (%d, %s)', array($id, $f));
 	}
-    public static function get_access($tab, $action, $record=null, $return_crits=false){
+    public static function get_access($tab, $action, $record=null, $return_crits=false, $return_in_array=false){
         if (!$return_crits && self::$admin_access && Base_AclCommon::i_am_admin()) {
             $ret = true;
         } elseif (isset($record[':active']) && !$record[':active'] && ($action=='edit' || $action=='delete' || $action=='clone')) {
@@ -1602,7 +1603,10 @@ class Utils_RecordBrowserCommon extends ModuleCommon {
 				$crits_raw = $cache[$tab]['crits_raw'];
 				$fields = $cache[$tab]['fields'];
 			}
-			if ($return_crits) return $crits[$action];
+			if ($return_crits) {
+			    if($return_in_array) return $crits_raw[$action];
+			    return $crits[$action];
+			}
 			if ($action=='browse') {
 				return $crits['view']!==null?(empty($crits['view'])?true:$crits['view']):false;
 			}
@@ -2058,7 +2062,7 @@ class Utils_RecordBrowserCommon extends ModuleCommon {
 			$field = self::$hash[$k];
 			$params = self::$table_rows[$field];
 			$event_display['what'][] = array(
-										_V($field),
+										_V($params['name']),
 										self::get_val($tab, $field, $r2, true, $params),
 										self::get_val($tab, $field, $r, true, $params)
 									);

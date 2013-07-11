@@ -329,6 +329,10 @@ class CRM_MeetingCommon extends ModuleCommon {
 		$ret = self::display_title($record, false);
 		return $ret;
 	}
+    public static function display_date($record) {
+        $time = strtotime($record['time']);
+        return Base_RegionalSettingsCommon::time2reg($record['date'] . ' ' . date('H:i:s', $time), false);
+    }
 	public static function get_status_change_leightbox_href($record, $nolink, $desc) {
 	    if($nolink) return false;
 		$prefix = 'crm_meeting_leightbox';
@@ -416,8 +420,16 @@ class CRM_MeetingCommon extends ModuleCommon {
 
 			if (isset($_REQUEST['day'])) $values['date'] = $_REQUEST['day'];
 			$ret = array();
-			$start = strtotime($values['date'].' '.date('H:i:s', $values['time']));
-			$start_disp = strtotime(Base_RegionalSettingsCommon::time2reg($start,true,true,true,false));
+            if ($values['time']) {
+                // normal event
+                $start = $values['time']; // time in unix timestamp UTC
+                $start_disp = strtotime(Base_RegionalSettingsCommon::time2reg($start,true,true,true,false));
+            } else {
+                // when event is timeless - all day event
+                $time = $values['date'].' 00:00:01';
+			    $start = Base_RegionalSettingsCommon::reg2time($time);
+                $start_disp = strtotime($time);
+            }
 			$end = strtotime('+'.$values['duration'].' seconds', $start);
 			$ret['day_details'] = array('start'=>array(
 				'day'=>'<a '.Base_BoxCommon::create_href(null, 'CRM/Calendar', 'body', array(array('default_view'=>'day', 'default_date'=>strtotime($values['date']))), array()).'>'.date('j', $start_disp).'</a>', 
@@ -472,7 +484,7 @@ class CRM_MeetingCommon extends ModuleCommon {
 					$reg_timestamp = $values['date'].' '.date('H:i:s', strtotime($time));
 					$timestamp = Base_RegionalSettingsCommon::reg2time($reg_timestamp);
 					$values['date'] = date('Y-m-d',$timestamp);
-					$values['time'] = date('1970-01-01 H:i:s',$timestamp);
+					$values['time'] = date('Y-m-d H:i:s',$timestamp);
 					if (isset($values['recurrence_end']) && $values['recurrence_end']) {
 						$values['recurrence_end'] = date('Y-m-d',Base_RegionalSettingsCommon::reg2time($values['recurrence_end'].' '.date('H:i:s', strtotime($time))));
 						if ($values['recurrence_end']<$values['date']) $values['recurrence_end'] = $values['date'];
@@ -716,9 +728,7 @@ class CRM_MeetingCommon extends ModuleCommon {
 		$cuss = array();
 		foreach ($r['customers'] as $c) {
 			$c = CRM_ContactsCommon::display_company_contact(array('customers'=>$c), true, array('id'=>'customers'));
-			$c = str_replace('&nbsp;',' ',$c);
-			if (mb_strlen($c,'UTF-8')>33) $c = mb_substr($c, 0, 30, 'UTF-8').'...';
-			$cuss[] = $c;
+            $cuss[] = str_replace('&nbsp;',' ',$c);
 		}
 
 		$inf2 += array(	__('Event')=> '<b>'.$next['title'].'</b>',
@@ -766,7 +776,7 @@ class CRM_MeetingCommon extends ModuleCommon {
 		$crits['recurrence_type'] = '';
 		
 		$count = 0;
-		$ret = Utils_RecordBrowserCommon::get_records('crm_meeting', $crits, array(), array(), CRM_CalendarCommon::$events_limit);
+		$ret = Utils_RecordBrowserCommon::get_records('crm_meeting', $crits, array(), array('date' => 'DESC', 'time' => 'DESC'), CRM_CalendarCommon::$events_limit);
 
 		$result = array();
 		foreach ($ret as $r)
@@ -808,7 +818,9 @@ class CRM_MeetingCommon extends ModuleCommon {
 	public static function search($word){
 		$ret = array();
 		if(Utils_RecordBrowserCommon::get_access('crm_meeting','browse')) {
-			$result = Utils_RecordBrowserCommon::get_records('crm_meeting',array('(~"title'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\''), '|~"description'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\'')));
+			$crits = array('(~"title'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\''), '|~"description'=>DB::Concat('\'%\'',DB::qstr($word),'\'%\''));
+            $limit = Base_SearchCommon::get_recordset_limit_records();
+			$result = Utils_RecordBrowserCommon::get_records('crm_meeting', $crits, array(), array(), $limit);
 
 	 		foreach ($result as $row) {
 				$ret[$row['id']] = Utils_RecordBrowserCommon::record_link_open_tag('crm_meeting', $row['id']).__( 'Meeting #%d, %s at %s', array($row['id'], $row['title'], Base_RegionalSettingsCommon::time2reg($row['date'], false))).Utils_RecordBrowserCommon::record_link_close_tag();

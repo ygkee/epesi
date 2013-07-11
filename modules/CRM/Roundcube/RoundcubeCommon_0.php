@@ -137,18 +137,22 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
     }
 
     public static function submit_mail($param, $mode) {
-        if($mode=='delete') {
-	    $m = Base_BoxCommon::main_module_instance();
-	    $id = $m->record['id'];
-	    $rs = $m->tab;
-	    $c = Utils_RecordBrowserCommon::get_records('rc_mails_assoc',array('mail'=>$param['id'],'recordset'=>$rs,'record_id'=>$id),array('id'));
-	    if(count($c)) {
-		foreach($c as $cc)
-		    Utils_RecordBrowserCommon::delete_record('rc_mails_assoc',$cc['id']);
-		location(array());
-		return false;
-	    }
-	}
+        if ($mode == 'delete') {
+            $m = Base_BoxCommon::main_module_instance();
+            $id = $m->record['id'];
+            $rs = $m->tab;
+            $c = Utils_RecordBrowserCommon::get_records('rc_mails_assoc', array('mail' => $param['id'], 'recordset' => $rs, 'record_id' => $id), array('id'));
+            if (count($c)) {
+                foreach ($c as $cc)
+                    Utils_RecordBrowserCommon::delete_record('rc_mails_assoc', $cc['id']);
+                location(array());
+                return false;
+            }
+        } else if ($mode == 'add') {
+            $param['message_id'] = ltrim(rtrim($param['message_id'],'>'),'<');
+        } else if ($mode == 'added') {
+            self::create_thread($param['id']);
+        }
         return $param;
     }
 
@@ -161,8 +165,23 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
     }
 
     public static function QFfield_attachments(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
+        if(isset($_GET['rc_reply']) || isset($_GET['rc_replyall']) || isset($_GET['rc_forward'])) {
+            $attachments = DB::GetAssoc('SELECT mime_id,name FROM rc_mails_attachments WHERE mail_id=%d AND attachment=1',array($rb_obj->record['id']));
+            $data = array();
+            if($attachments) {
+                $hash = md5(time().' '.serialize($rb_obj->record));
+                DB::Execute('INSERT INTO rc_mails_attachments_download(mail_id,hash) VALUES(%d,%s)',array($rb_obj->record['id'],$hash));
+                foreach($attachments as $k=>&$n) {
+                    $filename = DATA_DIR.'/CRM_Roundcube/attachments/'.$rb_obj->record['id'].'/'.$k;
+                    if(file_exists($filename)) {
+                        $data[] = '<a href="'.rtrim(get_epesi_url().'/').'/modules/CRM/Roundcube/get_remote.php?'.http_build_query(array('mime_id'=>$k,'mail_id'=>$rb_obj->record['id'],'hash'=>$hash)).'" target="_blank">'.$n.'</a>';
+                    }
+                }
+            }
+            $attachments = implode('<br />',$data);
+        } else $attachments = '';
 	if(isset($_GET['rc_reply']) && $_GET['rc_reply']==$rb_obj->record['id']) {
-		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array($rb_obj->record['from'],(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><stron>On '.Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'].' wrote:</strong><br/>'.$rb_obj->record['body']));
+		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array(html_entity_decode($rb_obj->record['from']),(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><strong>'.__('On %s wrote',array(Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'])).':</strong><br/>'.$rb_obj->record['body'].($attachments?'<hr /><strong>'.__('Attachments').':</strong><br/>'.$attachments:''),$rb_obj->record['message_id'],html_entity_decode($rb_obj->record['references'])));
 	} elseif(isset($_GET['rc_replyall']) && $_GET['rc_replyall']==$rb_obj->record['id']) {
 		$to = explode(',',$rb_obj->record['to']);
 		$to[] = $rb_obj->record['from'];
@@ -176,9 +195,9 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
 				}
 			}
 		}
-		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array(implode(', ',$to),(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><stron>On '.Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'].' wrote:</strong><br/>'.$rb_obj->record['body']));
+		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array(html_entity_decode(implode(', ',$to)),(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><strong>'.__('On %s wrote',array(Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'])).':</strong><br/>'.$rb_obj->record['body'].($attachments?'<hr /><strong>'.__('Attachments').':</strong><br/>'.$attachments:''),$rb_obj->record['message_id'],html_entity_decode($rb_obj->record['references'])));
 	} elseif(isset($_GET['rc_forward']) && $_GET['rc_forward']==$rb_obj->record['id']) {
-		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array('',(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><stron>On '.Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'].' wrote:</strong><br/>'.$rb_obj->record['body']));
+		Base_BoxCommon::push_module('CRM_Roundcube','new_mail',array('',(preg_match('/^Re:/i',$rb_obj->record['subject'])?'':'Re: ').$rb_obj->record['subject'],'<br /><br /><strong>'.__('On %s wrote',array(Base_RegionalSettingsCommon::time2reg($rb_obj->record['date']).', '.$rb_obj->record['from'])).':</strong><br/>'.$rb_obj->record['body'].($attachments?'<hr /><strong>'.__('Attachments').':</strong><br/>'.$attachments:'')));
 	}
 	Base_ActionBarCommon::add('reply',__('Reply'), Module::create_href(array('rc_reply'=>$rb_obj->record['id'])));
 	Base_ActionBarCommon::add('reply',__('Reply All'), Module::create_href(array('rc_replyall'=>$rb_obj->record['id'])));
@@ -189,36 +208,66 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
         return DB::GetOne('SELECT count(mime_id) FROM rc_mails_attachments WHERE mail_id=%d AND attachment=1',array($record['id']));
     }
 
+    public static function QFfield_thread_attachments(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
+        $form->addElement('static', $field, $label,self::display_thread_attachments($rb_obj->record,true,null));
+    }
+
+    public static function display_thread_attachments($record, $nolink, $desc) {
+        return DB::GetOne('SELECT count(mime_id) FROM rc_mails_attachments WHERE mail_id IN (SELECT m.id FROM rc_mails_data_1 m WHERE m.f_thread=%d AND m.active=1) AND attachment=1',array($record['id']));
+    }
+
+    public static function QFfield_thread_count(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
+        $form->addElement('static', $field, $label,self::display_thread_count($rb_obj->record,true,null));
+    }
+
+    public static function display_thread_count($record, $nolink, $desc) {
+        return DB::GetOne('SELECT count(*) FROM rc_mails_data_1 WHERE f_thread=%d AND active=1',array($record['id']));
+    }
+
+    public static function QFfield_mail_thread(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
+        $form->addElement('static', $field, $label,self::display_mail_thread($rb_obj->record,false,null));
+    }
+
+    public static function display_mail_thread($record, $nolink, $desc) {
+        if($record['thread']) return Utils_RecordBrowserCommon::record_link_open_tag('rc_mail_threads', $record['thread'], $nolink).DB::GetOne('SELECT count(*) FROM rc_mails_data_1 WHERE f_thread=%d AND active=1',array($record['thread'])).Utils_RecordBrowserCommon::record_link_close_tag();
+        return '';
+    }
+
     public static function display_subject($record, $nolink, $desc) {
-        static $last_message_id = null;
-        $chars_count = 100;
-        $body_preview = strip_tags($record['body']);
-        if (strlen($body_preview) > $chars_count)
-            $body_preview = substr($body_preview, 0, $chars_count) . " ...";
-        $subject_label = Utils_RecordBrowserCommon::create_linked_label_r('rc_mails','subject',$record,$nolink);
-        $subject_label = Utils_TooltipCommon::create($subject_label, "<pre class=\"wrap\">$body_preview</pre>", false);
-        $ret = $subject_label .'<br />From: '.$record['from'].'<br />To: '.$record['to'] . '<br />';
-        $replies = '<div style="text-align:center;float:right;width:20px;font-size:16px;line-height:20px;padding:8px;border-radius:18px;height:20px;background-color:gray;color:white;" class="num_of_replies"></div>';
-        if(!$record['references'] || $last_message_id===null || strpos($record['references'],$last_message_id)===false) {
+    /*    static $last_message_id = null;*/
+        if(isset($record['body'])) {
+            $chars_count = 100;
+            $body_preview = strip_tags($record['body']);
+            if (strlen($body_preview) > $chars_count)
+                $body_preview = substr($body_preview, 0, $chars_count) . " ...";
+            $subject_label = Utils_RecordBrowserCommon::create_linked_label_r('rc_mails','subject',$record,$nolink);
+            $subject_label = Utils_TooltipCommon::create($subject_label, "<pre class=\"wrap\">$body_preview</pre>", false);
+            $ret = $subject_label .'<br />From: '.$record['from'].'<br />To: '.$record['to'] . '<br />';
+        } else {
+            $ret = Utils_RecordBrowserCommon::create_linked_label_r('rc_mail_threads','subject',$record,$nolink);
+        }
+/*        $replies = '<div style="text-align:center;float:right;width:20px;font-size:16px;line-height:20px;padding:8px;border-radius:18px;height:20px;background-color:gray;color:white;" class="num_of_replies"></div>';
+        if(!$record['references'] || !$last_message_id || strpos($record['references'],$last_message_id)===false) {
             $last_message_id = $record['message_id'];
             return $replies.$ret;
         }
         if(!$last_message_id) return $replies.$ret;
-        return '<div style="margin-left:20px" class="reply parent_'.md5($last_message_id).'">'.$ret.'</div>';
+        return '<div style="margin-left:20px" class="reply parent_'.md5($last_message_id).'">'.$ret.'</div>';*/
+        return $ret;
 	}
-
-    public static function QFfield_direction(&$form, $field, $label, $mode, $default, $desc, $rb_obj) {
-        if($default)
-            $txt = __('Sent by employee');
-        else
-            $txt = __('Received by employee');
-        $form->addElement('static', $field, $label,$txt);
-    }
-
-    public static function display_direction($record, $nolink, $desc) {
-        if($record['direction'])
-            return '<div class="direction dark_blue_gradient border_radius_3px"><</div>';
-        return '<div class="direction dark_blue_gradient border_radius_3px">></div>';
+    
+    public static function create_thread($id) {
+        $m = Utils_RecordBrowserCommon::get_record('rc_mails',$id);
+        $thread = $m['thread'];
+        if(!$thread && $m['message_id'])
+          $thread = DB::GetOne('SELECT f_thread FROM rc_mails_data_1 WHERE f_references is not null AND f_references LIKE '.DB::Concat('\'%%\'','%s','\'%%\'').' AND active=1',array($m['message_id']));
+        if(!$thread && $m['references'])
+          $thread = DB::GetOne('SELECT f_thread FROM rc_mails_data_1 WHERE f_message_id is not null AND %s LIKE '.DB::Concat('\'%%\'','f_message_id','\'%%\'').' AND active=1',array($m['references']));
+        if(!$thread)
+          $thread = Utils_RecordBrowserCommon::new_record('rc_mail_threads',array('subject'=>$m['subject'],'contacts'=>array_unique(array_merge($m['contacts'],array('P:'.$m['employee']))),'first_date'=>$m['date'],'last_date'=>$m['date']));
+        Utils_RecordBrowserCommon::update_record('rc_mails',$id,array('thread'=>$thread));
+        $t = Utils_RecordBrowserCommon::get_record('rc_mail_threads',$thread);
+        Utils_RecordBrowserCommon::update_record('rc_mail_threads',$thread,array('contacts'=>array_unique(array_merge($t['contacts'],$m['contacts'],array('P:'.$m['employee']))),'first_date'=>strtotime($m['date'])<strtotime($t['first_date'])?$m['date']:$t['first_date'],'last_date'=>strtotime($m['date'])>strtotime($t['last_date'])?$m['date']:$t['last_date'],'subject'=>(trim($m['references'])=='' ||  mb_strlen($m['subject'])<mb_strlen($t['subject']))?$m['subject']:$t['subject']));
     }
 
     public static function display_record_id($r, $nolink=false) {
@@ -239,7 +288,7 @@ class CRM_RoundcubeCommon extends Base_AdminModuleCommon {
         $conf = array(array('type'=>'header','label'=>__('Choose accounts')));
         $ret = Utils_RecordBrowserCommon::get_records('rc_accounts',array('epesi_user'=>Acl::get_user()));
         foreach($ret as $row)
-                $conf[] = array('name'=>'account_'.$row['id'], 'label'=>__('%s at %s', array($row['login'],$row['server'])), 'type'=>'checkbox', 'default'=>1);
+                $conf[] = array('name'=>'account_'.$row['id'], 'label'=>$row['account_name'], 'type'=>'checkbox', 'default'=>1);
         if(count($conf)==1)
             return array(array('type'=>'static','label'=>__('No accounts configured, go Menu->My settings->Control panel->E-mail accounts')));
         return $conf;

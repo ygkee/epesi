@@ -323,8 +323,10 @@ class CRM_ContactsCommon extends ModuleCommon {
 		}
         $indicator_text = ($rset == 'P' ? __('Person') : __('Company'));
         $rindicator = isset($icon[$rset]) ?
-                '<span style="margin:1px 0.5em 1px 1px; width:1.5em; height:1.5em; display:inline-block; vertical-align:middle; background-image:url(\''.$icon[$rset].'\'); background-repeat:no-repeat; background-position:left center; background-size:100%"><span style="display:none">['.$indicator_text.'] </span></span>' : "[$rlabel] ";
+                '<span style="margin:1px 0.5em 1px 1px; width:1.5em; height:1.5em; display:inline-block; vertical-align:middle; background-image:url(\''.$icon[$rset].'\'); background-repeat:no-repeat; background-position:left center; background-size:100%"><span style="display:none">['.$indicator_text.'] </span></span>' : "[$indicator_text] ";
         $val = $rindicator.$val;
+        if ($nolink)
+            return strip_tags($val);
         return $val;
     }
     public static function auto_company_contact_suggestbox($str, $fcallback) {
@@ -1125,6 +1127,7 @@ class CRM_ContactsCommon extends ModuleCommon {
 
     public static function search($word){
         $ret = array();
+        $limit_per_recordset = Base_SearchCommon::get_recordset_limit_records();
         if(Utils_RecordBrowserCommon::get_access('contact','browse')) {
             $wo = explode(' ', $word);
 
@@ -1132,7 +1135,7 @@ class CRM_ContactsCommon extends ModuleCommon {
             foreach ($wo as $w)
                 $crits = Utils_RecordBrowserCommon::merge_crits($crits, array('("~first_name'=>DB::Concat(DB::qstr('%'),DB::qstr($w),DB::qstr('%')), '|"~last_name'=>DB::Concat(DB::qstr('%'),DB::qstr($w),DB::qstr('%'))));
 
-            $result = self::get_contacts($crits);
+            $result = self::get_contacts($crits, array(), array(), $limit_per_recordset);
 
             foreach ($result as $row)
                 $ret[] = Utils_RecordBrowserCommon::record_link_open_tag('contact', $row['id']).__( 'Contact #%d, %s %s', array($row['id'], $row['first_name'], $row['last_name'])).Utils_RecordBrowserCommon::record_link_close_tag();
@@ -1141,7 +1144,7 @@ class CRM_ContactsCommon extends ModuleCommon {
             $crits = array('("~company_name' => DB::Concat(DB::qstr('%'),DB::qstr($word),DB::qstr('%')),
                 '|"~short_name' => DB::Concat(DB::qstr('%'),DB::qstr($word),DB::qstr('%')));
 
-            $result = self::get_companies($crits);
+            $result = self::get_companies($crits, array(), array(), $limit_per_recordset);
 
             foreach ($result as $row)
                 $ret[] = Utils_RecordBrowserCommon::record_link_open_tag('company', $row['id']).__( 'Company #%d, %s', array($row['id'], $row['company_name'])).Utils_RecordBrowserCommon::record_link_close_tag();

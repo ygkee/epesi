@@ -208,7 +208,7 @@ class Utils_RecordBrowser extends Module {
 		if ($key==null) $key = $this->tab.'/'.$this->record['id'];
 		$a = $this->init_module('Utils_Attachment',array($key));
 		$a->set_view_func(array('Utils_RecordBrowserCommon','create_default_linked_label'),explode('/',$key));
-		$a->edit_note_queue();
+		$a->add_note_queue();
 	}
 	
 	public function add_note_button_href($key=null) {
@@ -366,7 +366,11 @@ class Utils_RecordBrowser extends Module {
 			if ($this->table_rows[$filter]['type']=='checkbox') {
                 $arr = array(''=>__('No'), 1=>__('Yes'));
             } else {
-                if ($this->table_rows[$filter]['type'] == 'commondata') {
+                if ($this->table_rows[$filter]['type'] == 'currency') {
+                    $arr = Utils_CurrencyFieldCommon::get_currencies();
+                    if (count($arr) <= 1)
+                        continue;
+                } else if ($this->table_rows[$filter]['type'] == 'commondata') {
 					$parts = explode('::', $this->table_rows[$filter]['param']['array_id']);
 					$array_id = array_shift($parts);
 					$arr = Utils_CommonDataCommon::get_translated_array($array_id, $this->table_rows[$filter]['param']['order_by_key']);
@@ -478,6 +482,12 @@ class Utils_RecordBrowser extends Module {
                     $this->crits = Utils_RecordBrowserCommon::merge_crits($this->crits, $new_crits);
                 }
             } else {
+                if ($this->table_rows[$filter]['type'] == 'currency') {
+                    if (isset($vals[$field_id]) && $vals[$field_id] != "__NULL__") {
+                        $this->crits["~$filter"] = "%__" . $vals[$field_id];
+                    }
+                    continue;
+                }
 				if ($this->table_rows[$filter]['type']=='timestamp' || $this->table_rows[$filter]['type']=='date') {
 					if (isset($vals[$field_id.'__from']) && $vals[$field_id.'__from'])
 						$this->crits['>='.$filter_id] = $vals[$field_id.'__from'].' 00:00:00';
@@ -968,7 +978,7 @@ class Utils_RecordBrowser extends Module {
                 $visible_cols[$args['id']] = true;
             }
 
-			$this->record = $this->custom_defaults = Utils_RecordBrowserCommon::record_processing($this->tab, $this->custom_defaults, 'adding');
+			self::$last_record = $this->record = $this->custom_defaults = Utils_RecordBrowserCommon::record_processing($this->tab, $this->custom_defaults, 'adding');
 
             $this->prepare_view_entry_details($this->custom_defaults, 'add', null, $form, $visible_cols);
             $form->setDefaults($this->custom_defaults);
@@ -1487,13 +1497,18 @@ class Utils_RecordBrowser extends Module {
 		$ret = array();
         if (is_array(Utils_RecordBrowser::$last_record))
 		    foreach (Utils_RecordBrowser::$last_record as $k=>$v) if (!isset($data[$k])) $data[$k] = $v;
-		$crits = Utils_RecordBrowserCommon::get_access($this->tab,'add',null, true);
-		Utils_RecordBrowserCommon::check_record_against_crits($this->tab, $data, $crits, $problems);
-		foreach ($problems as $f) {
-			$f = explode('[', $f);
-			$ret[$f[0]] = __('Invalid value');
-		}
-		return empty($ret)?true:$ret;
+//		$crits = Utils_RecordBrowserCommon::get_access($this->tab,'add',null, true);
+		$crits2 = Utils_RecordBrowserCommon::get_access($this->tab,'add',null, true, true);
+		foreach($crits2 as $crits) {
+    		Utils_RecordBrowserCommon::check_record_against_crits($this->tab, $data, $crits, $problems);
+    		foreach ($problems as $f) {
+	    		$f = explode('[', $f);
+		    	$ret[$f[0]] = __('Invalid value');
+		    }
+    		if($problems) continue;
+    		return true;
+    	}
+		return $ret;
     }
     public function prepare_view_entry_details($record, $mode, $id, $form, $visible_cols = null, $for_grid=false){
 	if ($mode == 'add')
@@ -1901,7 +1916,7 @@ class Utils_RecordBrowser extends Module {
 					$ref = explode(';', $row['param']);
 					$refe = explode('::',$ref[0]);
 					$row['rset'] = $refe[0];
-					$row['label_field'] = str_replace('|', ', ', $refe[1]);
+					$row['label_field'] = str_replace('|', ',', $refe[1]);
 					break;
 				case 'multiselect':
 					$row['select_data_type'] = 'select';
@@ -1915,7 +1930,7 @@ class Utils_RecordBrowser extends Module {
 						$row['order_by'] = ($order=='key'?'key':'value');
 						$row['commondata_table'] = $refe[1];
 					} else {
-						$row['label_field'] = str_replace('|', ', ', $refe[1]);
+						$row['label_field'] = str_replace('|', ',', $refe[1]);
 						$row['data_source'] = 'rset';
 						$row['rset'] = $tab;
 					}
@@ -2330,7 +2345,7 @@ class Utils_RecordBrowser extends Module {
                     $gb_row->add_data(
                         $date_and_time,
                         $row['edited_by']!==null?$user:'',
-                        _V($field_hash[$k]), // TRSL
+                        _V($this->table_rows[$field_hash[$k]]['name']), // TRSL
                         $old,
                         $new
                     );

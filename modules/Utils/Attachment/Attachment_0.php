@@ -802,15 +802,13 @@ class Utils_Attachment extends Module {
 		}
 		if($file) {
 			DB::StartTrans();
-			$rev = DB::GetOne('SELECT max(x.revision) FROM utils_attachment_file x WHERE x.attach_id=%d',array($id));
-			$rev = $rev+1;
-			DB::Execute('INSERT INTO utils_attachment_file(attach_id,original,created_by,revision) VALUES(%d,%s,%d,%d)',array($id,$oryg,Acl::get_user(),$rev));
+			DB::Execute('INSERT INTO utils_attachment_file(attach_id,original,created_by) VALUES(%d,%s,%d)',array($id,$oryg,Acl::get_user()));
 			DB::CompleteTrans();
 			$local = $this->get_data_dir().$this->group;
 			@mkdir($local,0777,true);
 			$dest_file = $local.'/'.$id.'_'.$rev;
 			rename($file,$dest_file);
-			if ($this->add_func) call_user_func($this->add_func,$id,$rev,$dest_file,$oryg,$this->add_args);
+			if ($this->add_func) call_user_func($this->add_func,$id,$dest_file,$oryg,$this->add_args);
 		}
 		$this->ret_attach = false;
 		if (isset($this->watchdog_category)) Utils_WatchdogCommon::new_event($this->watchdog_category,$this->watchdog_id,'N_~_'.$id);
@@ -819,12 +817,10 @@ class Utils_Attachment extends Module {
 	public function delete($id) {
 		if($this->persistent_deletion) {
 			DB::Execute('DELETE FROM utils_attachment_note WHERE attach_id=%d',array($id));
-			$rev = DB::GetAssoc('SELECT id,revision FROM utils_attachment_file WHERE attach_id=%d',array($id));
-			$file_base = $this->get_data_dir().$this->group.'/'.$id.'_';
-			foreach($rev as $mid=>$i) {
-			    @unlink($file_base.$i);
-			    DB::Execute('DELETE FROM utils_attachment_download WHERE attach_file_id=%d',array($mid));
-			}
+			$mid = DB::GetOne('SELECT id FROM utils_attachment_file WHERE attach_id=%d',array($id));
+			$file_base = $this->get_data_dir().$this->group.'/'.$mid;
+		    @unlink($file_base);
+		    DB::Execute('DELETE FROM utils_attachment_download WHERE attach_file_id=%d',array($mid));
 			DB::Execute('DELETE FROM utils_attachment_file WHERE attach_id=%d',array($id));
 			DB::Execute('DELETE FROM utils_attachment_link WHERE id=%d',array($id));
 		} else {
@@ -922,6 +918,67 @@ class Utils_Attachment extends Module {
 
 	public function user_addon($uid) {
 		$this->body(null, null, $uid);
+	}
+	
+	public function add_note() {
+		if(!$this->is_back()) {
+			load_js('modules/Utils/Attachment/js/lib/plupload.js');
+			load_js('modules/Utils/Attachment/js/lib/plupload.flash.js');
+			load_js('modules/Utils/Attachment/js/lib/plupload.browserplus.js');
+			load_js('modules/Utils/Attachment/js/lib/plupload.html4.js');
+			load_js('modules/Utils/Attachment/js/lib/plupload.html5.js');
+			load_js('modules/Utils/Attachment/attachments.js');
+			if (!isset($_SESSION['client']['utils_attachment'][CID])) $_SESSION['client']['utils_attachment'][CID] = array('files'=>array());
+			eval_js('Utils_Attachment__init_uploader()');
+			eval_js_once('var Utils_Attachment__delete_button = "'.Base_ThemeCommon::get_template_file('Utils_Attachment', 'delete.png').'";');
+			eval_js_once('var Utils_Attachment__restore_button = "'.Base_ThemeCommon::get_template_file('Utils_Attachment', 'restore.png').'";');
+			
+			$attachButtons = '<div id="multiple_attachments"><div id="filelist"></div></div>';
+
+			if (!is_array($this->group))
+    			Base_ActionBarCommon::add('add',__('Select files'),'href="javascript:void(0);" id="pickfiles"');
+
+			$new_note_form = $this->get_edit_form();
+			
+			eval_js('Utils_Attachment__submit_note = function() {'.$new_note_form->get_submit_form_js().'}');
+			$new_note_form->addElement('hidden', 'note_id', null, array('id'=>'note_id'));
+			$new_note_form->addElement('hidden', 'delete_files', null, array('id'=>'delete_files'));
+			$new_note_form->addElement('hidden', 'clipboard_files', null, array('id'=>'clipboard_files'));
+			
+			if ($new_note_form->validate()) {
+				$new_note_form->process(array($this, 'submit_attach'));
+				$this->ret_attach = false;
+				return $this->pop_box0();;
+			}
+			
+			$renderer = new HTML_QuickForm_Renderer_TCMSArraySmarty(); 
+			$new_note_form->accept($renderer); 
+			$form_data = $renderer->toArray();
+
+			print($form_data['javascript'].'<form '.$form_data['attributes'].'>'.$form_data['hidden']);
+
+			$inline_form_theme = $this->init_module('Base_Theme');
+			$inline_form_theme->assign('form', $form_data);
+			$inline_form_theme->display('inline_form');
+			
+			print($attachButtons);
+			print('</form>');
+
+			Base_ActionBarCommon::add('save',__('Save'),'onclick="if(uploader.files.length)uploader.start();else Utils_Attachment__submit_note();"');
+			Base_ActionBarCommon::add('back',__('Back'),$this->create_back_href());
+		} else {
+			$this->ret_attach = false;
+		}
+
+		$this->caption = __('Add note');
+
+		if(!$this->ret_attach)
+			return $this->pop_box0();
+	}
+
+
+	public function add_note_queue() {
+		$this->push_box0('add_note',array(),array($this->group,$this->persistent_deletion,$this->private_read,$this->private_write,$this->protected_read,$this->protected_write,$this->public_read,$this->public_write,$this->add_header,$this->watchdog_category,$this->watchdog_id,$this->func,$this->args,$this->add_func,$this->add_args,$this->max_file_size));
 	}
 }
 
